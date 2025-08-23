@@ -1,67 +1,59 @@
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use rayon::prelude::*;
+use std::env;
 
 use crate::{
     board::Board,
-    solver::{ExplorerStrategy, Solver, Stats},
+    solver::{ExplorerStrategy, Solver},
+    stats::{Stats, StatsSummary, print_comparison_table},
 };
 
 pub(crate) mod board;
 pub(crate) mod solver;
-
-fn run_and_get_stats(strategy: ExplorerStrategy) -> Stats {
-    let b = Board::random_with_solution(1_000_000);
-    let mut solver = Solver::new(strategy);
-    solver.solve(b).expect("No solution founded");
-
-    solver.get_solution_stats()
-}
+pub(crate) mod stats;
 
 fn main() {
-    let n = 100_000;
+    // Configurable via env (fish/zsh/bash compatible): O8_RUNS, O8_SCRAMBLE_STEPS
+    let n: usize = env::var("O8_RUNS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(200);
+    let scramble_steps: usize = env::var("O8_SCRAMBLE_STEPS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(200);
 
-    println!("Running {n} times DFS and BFS...");
-    let dfs_run: Vec<Stats> = (0..n)
+    println!(
+        "Generando {n} tableros aleatorios con {scramble_steps} movimientos y comparando DFS vs BFS..."
+    );
+
+    // Generar los mismos tableros para ambas estrategias
+    let boards: Vec<Board> = (0..n)
         .into_par_iter()
-        .map(|_| run_and_get_stats(ExplorerStrategy::Dfs))
+        .map(|_| Board::random_with_solution(scramble_steps))
         .collect();
 
-    let bfs_run: Vec<Stats> = (0..n)
-        .into_par_iter()
-        .map(|_| run_and_get_stats(ExplorerStrategy::Bfs))
+    // Ejecutar DFS
+    let dfs_run: Vec<Stats> = boards
+        .par_iter()
+        .map(|b| {
+            let mut solver = Solver::new(ExplorerStrategy::Dfs);
+            solver.solve(*b).expect("No solution founded");
+            solver.get_solution_stats()
+        })
         .collect();
 
-    // Get average of runs and show it
-    // DFS
-    let dfs_average = Stats {
-        nodes_explored: dfs_run.iter().map(|s| s.nodes_explored).sum::<usize>() / n,
-        solution_moves: dfs_run.iter().map(|s| s.solution_moves).sum::<usize>() / n,
-        max_list_to_explore_size: dfs_run
-            .iter()
-            .map(|s| s.max_list_to_explore_size)
-            .sum::<usize>()
-            / n,
-        average_list_to_explore_size: dfs_run
-            .iter()
-            .map(|s| s.average_list_to_explore_size)
-            .sum::<u128>()
-            / n as u128,
-    };
-    println!("DFS average over {n} runs: {dfs_average:#?}");
+    // Ejecutar BFS
+    let bfs_run: Vec<Stats> = boards
+        .par_iter()
+        .map(|b| {
+            let mut solver = Solver::new(ExplorerStrategy::Bfs);
+            solver.solve(*b).expect("No solution founded");
+            solver.get_solution_stats()
+        })
+        .collect();
 
-    // BFS
-    let bfs_average = Stats {
-        nodes_explored: bfs_run.iter().map(|s| s.nodes_explored).sum::<usize>() / n,
-        solution_moves: bfs_run.iter().map(|s| s.solution_moves).sum::<usize>() / n,
-        max_list_to_explore_size: bfs_run
-            .iter()
-            .map(|s| s.max_list_to_explore_size)
-            .sum::<usize>()
-            / n,
-        average_list_to_explore_size: bfs_run
-            .iter()
-            .map(|s| s.average_list_to_explore_size)
-            .sum::<u128>()
-            / n as u128,
-    };
-    println!("BFS average over {n} runs: {bfs_average:#?}");
+    let dfs_summary = StatsSummary::from_runs(ExplorerStrategy::Dfs, &dfs_run);
+    let bfs_summary = StatsSummary::from_runs(ExplorerStrategy::Bfs, &bfs_run);
+
+    print_comparison_table(&dfs_summary, &bfs_summary);
 }
