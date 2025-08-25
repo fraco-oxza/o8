@@ -1,21 +1,45 @@
+//! # Statistics Module
+//! 
+//! This module provides comprehensive statistics collection and reporting
+//! for the 8-puzzle solver performance analysis. It tracks various metrics
+//! during the search process and provides formatted output for comparison
+//! between different search strategies.
+
 use std::fmt::{self, Display};
 
 use crate::solver::ExplorerStrategy;
 
+/// Width for metric column in comparison table
 const METRIC_WIDTH: usize = 24;
+
+/// Width for algorithm columns in comparison table
 const ALGO_WIDTH: usize = 16;
 
+/// Individual statistics for a single puzzle solve
+/// 
+/// Contains detailed metrics about the search process for one puzzle instance,
+/// including performance data, search space exploration, and solution quality.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Stats {
+    /// The search strategy used (DFS or BFS)
     pub strategy: ExplorerStrategy,
+    /// Total number of board states explored
     pub nodes_explored: usize,
+    /// Number of moves in the optimal solution found
     pub solution_moves: usize,
+    /// Maximum size of the frontier during search
     pub max_frontier: usize,
+    /// Average size of the frontier throughout the search
     pub avg_frontier: f64,
+    /// Total number of successor states generated
     pub generated_nodes: usize,
+    /// Total number of states added to the frontier
     pub enqueued_nodes: usize,
+    /// Number of duplicate states that were pruned
     pub duplicates_pruned: usize,
+    /// Maximum depth reached in the search tree
     pub max_depth_reached: usize,
+    /// Time taken to solve the puzzle in milliseconds
     pub duration_ms: u128,
 }
 
@@ -38,22 +62,39 @@ impl Display for Stats {
     }
 }
 
+/// Aggregated statistics summary for multiple puzzle runs
+/// 
+/// Provides averaged metrics across multiple puzzle solves for comparing
+/// the overall performance characteristics of different search strategies.
 #[derive(Clone, Debug, Default)]
 pub struct StatsSummary {
+    /// The search strategy these statistics represent
     pub strategy: ExplorerStrategy,
+    /// Number of puzzle instances included in this summary
     pub runs: usize,
+    /// Average number of board states explored per run
     pub avg_nodes_explored: f64,
+    /// Average number of moves in solutions found
     pub avg_solution_moves: f64,
+    /// Average maximum frontier size per run
     pub avg_max_frontier: f64,
+    /// Average frontier size throughout all runs
     pub avg_frontier: f64,
+    /// Average number of successor states generated per run
     pub avg_generated_nodes: f64,
+    /// Average number of states enqueued per run
     pub avg_enqueued_nodes: f64,
+    /// Average number of duplicate states pruned per run
     pub avg_duplicates_pruned: f64,
+    /// Average maximum depth reached per run
     pub avg_max_depth_reached: f64,
+    /// Average solve time per run in milliseconds
     pub avg_duration_ms: f64,
+    /// Throughput metric: nodes explored per millisecond
     pub throughput_nodes_per_ms: f64,
 }
 
+/// Converts a slice of individual stats into an aggregated summary
 impl From<&[Stats]> for StatsSummary {
     fn from(value: &[Stats]) -> Self {
         let n = value.len().max(1) as f64;
@@ -112,6 +153,16 @@ impl From<&[Stats]> for StatsSummary {
     }
 }
 
+/// Formats a cell in the comparison table with proper padding
+/// 
+/// # Arguments
+/// 
+/// * `width` - The desired width of the cell
+/// * `val` - The value to display in the cell
+/// 
+/// # Returns
+/// 
+/// A string padded to the specified width
 fn fmt_cell(width: usize, val: impl Into<String>) -> String {
     let s = val.into();
     if s.len() >= width {
@@ -125,6 +176,15 @@ fn fmt_cell(width: usize, val: impl Into<String>) -> String {
     }
 }
 
+/// Formats a numeric value for display in the comparison table
+/// 
+/// # Arguments
+/// 
+/// * `n` - The numeric value to format
+/// 
+/// # Returns
+/// 
+/// A formatted string with appropriate precision
 fn fmt_num(n: f64) -> String {
     if n.is_finite() {
         if n.abs() >= 1000.0 {
@@ -137,15 +197,24 @@ fn fmt_num(n: f64) -> String {
     }
 }
 
+/// Prints a formatted comparison table of two search strategies
+/// 
+/// Displays a comprehensive side-by-side comparison of performance metrics
+/// for two different search strategies (typically DFS vs BFS).
+/// 
+/// # Arguments
+/// 
+/// * `left` - Statistics summary for the first strategy
+/// * `right` - Statistics summary for the second strategy
 pub fn print_comparison_table(left: &StatsSummary, right: &StatsSummary) {
     let title = format!(
-        "Comparativa de estrategias (runs: {}, {:?} vs {:?})",
+        "Strategy Comparison (runs: {}, {:?} vs {:?})",
         left.runs, left.strategy, right.strategy
     );
     println!("\n{title}\n");
 
     let headers = [
-        ("Métrica", METRIC_WIDTH),
+        ("Metric", METRIC_WIDTH),
         ("DFS (avg)", ALGO_WIDTH),
         ("BFS (avg)", ALGO_WIDTH),
     ];
@@ -173,48 +242,48 @@ pub fn print_comparison_table(left: &StatsSummary, right: &StatsSummary) {
     };
 
     row(
-        "Tiempo por run (ms)",
+        "Time per run (ms)",
         left.avg_duration_ms,
         right.avg_duration_ms,
     );
     row(
-        "Nodos explorados",
+        "Nodes explored",
         left.avg_nodes_explored,
         right.avg_nodes_explored,
     );
     row(
-        "Nodos generados",
+        "Nodes generated",
         left.avg_generated_nodes,
         right.avg_generated_nodes,
     );
     row(
-        "Encolados",
+        "Enqueued",
         left.avg_enqueued_nodes,
         right.avg_enqueued_nodes,
     );
     row(
-        "Descartes (duplicados)",
+        "Discards (duplicates)",
         left.avg_duplicates_pruned,
         right.avg_duplicates_pruned,
     );
     row(
-        "Longitud solución (movs)",
+        "Solution length (moves)",
         left.avg_solution_moves,
         right.avg_solution_moves,
     );
     row(
-        "Pico frontera",
+        "Peak frontier",
         left.avg_max_frontier,
         right.avg_max_frontier,
     );
-    row("Frontera media", left.avg_frontier, right.avg_frontier);
+    row("Average frontier", left.avg_frontier, right.avg_frontier);
     row(
-        "Profundidad máx.",
+        "Max depth",
         left.avg_max_depth_reached,
         right.avg_max_depth_reached,
     );
     row(
-        "Rendimiento (nodos/ms)",
+        "Throughput (nodes/ms)",
         left.throughput_nodes_per_ms,
         right.throughput_nodes_per_ms,
     );

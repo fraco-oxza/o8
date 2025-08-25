@@ -1,1 +1,29 @@
-/target
+# Rust
+/target/
+Cargo.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+/doc/
+
+# Backup files
+*.bak
+*.orig
+
+# Logs
+*.log
+
+# Runtime
+*.pid
+*.seed
+*.pid.lock

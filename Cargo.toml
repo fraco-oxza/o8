@@ -2,6 +2,12 @@
 name = "o8"
 version = "0.1.0"
 edition = "2024"
+description = "A high-performance 8-puzzle solver comparing DFS vs BFS search strategies"
+authors = ["Francisco C. Ossa <francisco@oza.cl>"]
+license = "MIT"
+repository = "https://github.com/fraco-oxza/o8"
+keywords = ["puzzle", "search", "algorithm", "dfs", "bfs"]
+categories = ["algorithms", "command-line-utilities"]
 
 [dependencies]
 clap = { version = "4.5.45", features = ["derive"] }
