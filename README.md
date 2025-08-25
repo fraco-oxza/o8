@@ -121,6 +121,50 @@ The board state is encoded in a compact 32-bit representation where each tile's 
 - Efficient hash table storage
 - Minimal memory footprint
 
+#### Encoding Strategy
+
+The key insight is that instead of storing "what tile is at each position", we store "at what position is each tile". This clever approach:
+
+1. **Uses only 32 bits total** (8 tiles × 4 bits each = 32 bits)
+2. **Makes the empty space implicit** (the position not occupied by any tile)
+3. **Enables fast bitwise operations** for moves and comparisons
+
+#### Bit Layout
+
+```text
+Bits:  31-28  27-24  23-20  19-16  15-12  11-8   7-4    3-0
+Tile:    8      7      6      5      4     3      2      1
+Value: pos8   pos7   pos6   pos5   pos4  pos3   pos2   pos1
+```
+
+#### Example: Solved State
+
+```text
+Board Layout:         Encoding:
+1 2 3                Tile 1 at pos 0: 0000
+4 5 6                Tile 2 at pos 1: 0001
+7 8                  Tile 3 at pos 2: 0010
+                     Tile 4 at pos 3: 0011
+Positions:           Tile 5 at pos 4: 0100
+0 1 2                Tile 6 at pos 5: 0101
+3 4 5                Tile 7 at pos 6: 0110
+6 7 8                Tile 8 at pos 7: 0111
+                     Empty at pos 8:  (implicit)
+```
+
+Binary: `01110110010101000011001000010000` = 1985229328
+
+#### Testing the Encoding
+
+You can explore the encoding with the built-in debug utilities:
+
+```bash
+cargo test test_solved_board_encoding -- --nocapture
+cargo test test_encoding_explanation -- --nocapture
+```
+
+This will show you exactly how the bits are arranged and how they change when moves are made.
+
 ### Parallel Processing
 
 The solver leverages Rayon for parallel execution:

@@ -3,6 +3,45 @@
 //! This module contains the implementation of the 8-puzzle board and related functionality.
 //! The board is represented as a compact 32-bit integer where each tile position is encoded
 //! using 4 bits, allowing for efficient storage and manipulation.
+//!
+//! ## Board Encoding Strategy
+//!
+//! The key insight is that instead of storing "what number is at each position",
+//! we store "at what position is each number". This allows us to:
+//!
+//! 1. **Compact Representation**: Use only 32 bits for the entire board state
+//! 2. **Fast Operations**: Bitwise operations for moves and comparisons  
+//! 3. **Implicit Empty Space**: The missing position automatically represents the empty space
+//!
+//! ### Encoding Details
+//!
+//! - Each tile (1-8) gets 4 bits to store its position (0-8)
+//! - Tile 1's position is stored in bits 0-3
+//! - Tile 2's position is stored in bits 4-7
+//! - And so on...
+//! - The empty space position is found by determining which position (0-8) is not occupied
+//!
+//! ### Example Encoding
+//!
+//! For a solved board:
+//! ```text
+//! 1 2 3
+//! 4 5 6  
+//! 7 8  
+//! ```
+//!
+//! The encoding would be:
+//! - Tile 1 at position 0 → bits 0-3: 0000
+//! - Tile 2 at position 1 → bits 4-7: 0001  
+//! - Tile 3 at position 2 → bits 8-11: 0010
+//! - Tile 4 at position 3 → bits 12-15: 0011
+//! - Tile 5 at position 4 → bits 16-19: 0100
+//! - Tile 6 at position 5 → bits 20-23: 0101
+//! - Tile 7 at position 6 → bits 24-27: 0110
+//! - Tile 8 at position 7 → bits 28-31: 0111
+//! - Empty space at position 8 (implicit)
+//!
+//! This gives us the magic number: `SOLVED_BOARD = 1985229328`
 
 use std::fmt::Display;
 
@@ -40,10 +79,47 @@ pub enum Direction {
 
 /// Represents an 8-puzzle board state
 ///
+/// ## Compact 32-bit Encoding
+///
 /// The board is stored as a compact 32-bit integer where each tile's position
-/// is encoded using 4 bits. This allows for efficient storage, copying, and
-/// hashing operations. The empty space is represented implicitly as the missing
-/// position in the encoding.
+/// is encoded using 4 bits. This representation is based on the insight that
+/// instead of storing "what tile is at each position", we store "at what position
+/// is each tile".
+///
+/// ### Why This Encoding?
+///
+/// 1. **Memory Efficient**: Only 32 bits instead of 36+ bytes for arrays
+/// 2. **Copy Efficient**: Single integer copy instead of array copy
+/// 3. **Hash Friendly**: Perfect for HashMap/HashSet keys
+/// 4. **Cache Friendly**: Fits in a single cache line
+/// 5. **Implicit Empty Space**: No need to explicitly track empty position
+///
+/// ### Bit Layout
+///
+/// ```text
+/// Bits:  31-28  27-24  23-20  19-16  15-12  11-8   7-4    3-0
+/// Tile:    8      7      6      5      4     3      2      1
+/// Value: pos8   pos7   pos6   pos5   pos4  pos3   pos2   pos1
+/// ```
+///
+/// Each 4-bit field stores the position (0-8) where that tile is located.
+///
+/// ### Example: Solved State
+///
+/// ```text
+/// Board Layout:     Binary Encoding:
+/// 1 2 3            Tile 1 at pos 0: 0000
+/// 4 5 6            Tile 2 at pos 1: 0001
+/// 7 8               Tile 3 at pos 2: 0010
+///                  Tile 4 at pos 3: 0011
+/// Positions:       Tile 5 at pos 4: 0100
+/// 0 1 2            Tile 6 at pos 5: 0101
+/// 3 4 5            Tile 7 at pos 6: 0110
+/// 6 7 8            Tile 8 at pos 7: 0111
+///                  Empty at pos 8:  (implicit)
+/// ```
+///
+/// This produces: `0111_0110_0101_0100_0011_0010_0001_0000` = 1985229328
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Board(u32);
 
@@ -79,6 +155,28 @@ impl Board {
 
     /// Converts the compact board representation to a 2D array format
     ///
+    /// This function reverses the encoding process: instead of storing where each
+    /// tile is located, it reconstructs what tile is at each position.
+    ///
+    /// ## Algorithm
+    ///
+    /// 1. Initialize array with zeros (empty positions)
+    /// 2. For each tile (1-8):
+    ///    - Extract its position from the 4-bit field
+    ///    - Place the tile number at that position in the array
+    /// 3. Position 8 remains 0 (empty space) if not occupied
+    ///
+    /// ## Example
+    ///
+    /// For encoded value `1985229328`:
+    /// ```text
+    /// Tile 1 → Extract bits 0-3:   0000 = position 0
+    /// Tile 2 → Extract bits 4-7:   0001 = position 1  
+    /// Tile 3 → Extract bits 8-11:  0010 = position 2
+    /// ...
+    /// Result: [1, 2, 3, 4, 5, 6, 7, 8, 0]
+    /// ```
+    ///
     /// # Returns
     ///
     /// A 9-element array where each position contains the tile number,
@@ -87,8 +185,11 @@ impl Board {
         let bits = self.0;
         let mut arr = [0b0; BOARD_AREA];
 
+        // For each tile (0-7 representing tiles 1-8)
         for val in 0..(BOARD_AREA - 1) {
+            // Extract the 4-bit position field for this tile
             let pos = (bits.unbounded_shr((val * TILE_BIT_SIZE) as u32)) % (1 << TILE_BIT_SIZE);
+            // Place the tile number (val + 1) at its encoded position
             arr[pos as usize] = (val + 1) as u8;
         }
 
@@ -126,9 +227,29 @@ impl Board {
 
     /// Finds the current position of the empty space on the board
     ///
-    /// The empty space is identified as the position not occupied by any tile.
-    /// This is determined by creating a bitmask of all occupied positions and
-    /// finding the first unset bit.
+    /// Since we only store positions for tiles 1-8, the empty space is implicitly
+    /// the position that's NOT occupied by any tile.
+    ///
+    /// ## Algorithm
+    ///
+    /// 1. Create a bitmask representing all occupied positions
+    /// 2. For each tile, set the bit corresponding to its position
+    /// 3. Find the first unset bit (0-8) - this is the empty space
+    ///
+    /// ## Example
+    ///
+    /// If tiles occupy positions [0,1,2,3,4,5,6,7]:
+    /// ```text
+    /// Bitmask: 011111111 (positions 0-7 occupied)
+    /// Missing: position 8 → empty space at position 8
+    /// ```
+    ///
+    /// ## Why This Works
+    ///
+    /// - We have 9 positions (0-8) and 8 tiles
+    /// - Each tile occupies exactly one position  
+    /// - The unoccupied position is where the empty space is
+    /// - `trailing_ones()` finds the first 0 bit, which is our answer
     ///
     /// # Returns
     ///
@@ -136,11 +257,13 @@ impl Board {
     fn find_space_position(&self) -> u32 {
         let mut idx: u32 = 0;
 
+        // Build bitmask of occupied positions
         for val in 0..(BOARD_AREA - 1) {
             let pos = (self.0.unbounded_shr((val * TILE_BIT_SIZE) as u32)) % (1 << TILE_BIT_SIZE);
-            idx |= 1 << pos;
+            idx |= 1 << pos; // Set bit at position 'pos'
         }
 
+        // Find first unset bit (empty position)
         idx.trailing_ones()
     }
 
@@ -169,27 +292,48 @@ impl Board {
 
     /// Gets the tile value at a specific position
     ///
+    /// This function searches through all tiles to find which one is located
+    /// at the specified position. It's essentially the inverse of the encoding.
+    ///
+    /// ## Algorithm
+    ///
+    /// 1. Iterate through all tiles (1-8, represented as 0-7 internally)
+    /// 2. For each tile, extract its encoded position
+    /// 3. If the position matches what we're looking for, return the tile number
+    /// 4. If no tile is found at that position, it means the position is empty
+    ///
+    /// ## Example
+    ///
+    /// To find what's at position 2:
+    /// ```text
+    /// Check tile 1: position = bits 0-3   → if == 2, return 0 (tile 1)
+    /// Check tile 2: position = bits 4-7   → if == 2, return 1 (tile 2)  
+    /// Check tile 3: position = bits 8-11  → if == 2, return 2 (tile 3) ✓
+    /// ```
+    ///
     /// # Arguments
     ///
     /// * `p` - The position to query (0-8)
     ///
     /// # Returns
     ///
-    /// The tile number (0-7) at the specified position
+    /// The tile number (0-7 representing tiles 1-8) at the specified position
     ///
     /// # Panics
     ///
-    /// Panics if the position doesn't contain a valid tile
+    /// Panics if the position doesn't contain a valid tile (i.e., it's the empty space)
     fn get_value(&self, p: u32) -> u32 {
         let mut target_val = 0;
         let mut target_pos = 0;
 
+        // Search through all tiles to find which one is at position 'p'
         for val in 0..(BOARD_AREA - 1) {
             target_val = val as u32;
+            // Extract position for tile 'val' from its 4-bit field
             target_pos =
                 (self.0.unbounded_shr((TILE_BIT_SIZE * val) as u32)) % (1 << TILE_BIT_SIZE);
             if target_pos == p {
-                break;
+                break; // Found the tile at position 'p'
             }
         }
 
@@ -197,19 +341,48 @@ impl Board {
             panic!("Invalid move: cannot move space in that direction");
         }
 
-        target_val
+        target_val // Return tile number (0-7)
     }
 
     /// Sets a tile value at a specific position in the compact representation
     ///
+    /// This function updates the encoding to move a tile to a new position.
+    /// It modifies the 4-bit field corresponding to the specified tile.
+    ///
+    /// ## Algorithm
+    ///
+    /// 1. Create a mask to clear the old position for tile `val`
+    /// 2. Clear the 4-bit field for tile `val` using bitwise AND with inverted mask
+    /// 3. Set the new position using bitwise OR
+    ///
+    /// ## Example
+    ///
+    /// To move tile 3 (val=2) to position 5 (p=5):
+    /// ```text
+    /// 1. Create mask for bits 8-11:  mask = 1111_0000_0000
+    /// 2. Clear old position:         board &= !mask
+    /// 3. Set new position:           board |= (5 << 8)
+    /// ```
+    ///
+    /// ## Bit Operations Breakdown
+    ///
+    /// - `(1 << TILE_BIT_SIZE) - 1` creates mask `1111`
+    /// - `mask << (TILE_BIT_SIZE * val)` positions the mask at tile's field
+    /// - `&= !mask` clears the old value
+    /// - `|= p << (TILE_BIT_SIZE * val)` sets the new position
+    ///
     /// # Arguments
     ///
     /// * `p` - The position to place the tile at (0-8)
-    /// * `val` - The tile number (0-7) to place
+    /// * `val` - The tile number (0-7 representing tiles 1-8) to place
     fn set_value(&mut self, p: u32, val: u32) {
+        // Create 4-bit mask: 0000_1111
         let ones = (1 << TILE_BIT_SIZE) - 1;
+        // Position mask at tile's bit field
         let mask = ones << (TILE_BIT_SIZE as u32 * val);
+        // Clear old position
         self.0 &= !mask;
+        // Set new position
         self.0 |= p << (TILE_BIT_SIZE as u32 * val);
     }
 
