@@ -2,6 +2,9 @@ use std::fmt::{self, Display};
 
 use crate::solver::ExplorerStrategy;
 
+const METRIC_WIDTH: usize = 24;
+const ALGO_WIDTH: usize = 16;
+
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Stats {
     pub strategy: ExplorerStrategy,
@@ -13,7 +16,7 @@ pub struct Stats {
     pub enqueued_nodes: usize,
     pub duplicates_pruned: usize,
     pub max_depth_reached: usize,
-    pub duration_ms: f64,
+    pub duration_ms: u128,
 }
 
 impl Display for Stats {
@@ -85,7 +88,7 @@ impl From<&[Stats]> for StatsSummary {
             .iter()
             .fold(0.0, |a, s| sum(a, s.max_depth_reached as f64))
             / n;
-        let avg_duration_ms = value.iter().fold(0.0, |a, s| sum(a, s.duration_ms)) / n;
+        let avg_duration_ms = value.iter().fold(0.0, |a, s| sum(a, s.duration_ms as f64)) / n;
         let throughput_nodes_per_ms = if avg_duration_ms > 0.0 {
             avg_nodes_explored / avg_duration_ms
         } else {
@@ -117,7 +120,7 @@ fn fmt_cell(width: usize, val: impl Into<String>) -> String {
         let pad = width - s.len();
         let mut out = String::with_capacity(width);
         out.push_str(&s);
-        out.extend(std::iter::repeat(' ').take(pad));
+        out.extend(std::iter::repeat_n(" ", pad));
         out
     }
 }
@@ -136,18 +139,15 @@ fn fmt_num(n: f64) -> String {
 
 pub fn print_comparison_table(left: &StatsSummary, right: &StatsSummary) {
     let title = format!(
-        "Comparativa de estrategias (runs: {}, {} vs {})",
-        left.runs,
-        format!("{:?}", left.strategy),
-        format!("{:?}", right.strategy)
+        "Comparativa de estrategias (runs: {}, {:?} vs {:?})",
+        left.runs, left.strategy, right.strategy
     );
     println!("\n{title}\n");
 
-    let headers = vec![
-        ("Métrica", 24usize),
-        ("DFS (avg)", 16usize),
-        ("BFS (avg)", 16usize),
-        ("Mejor", 8usize),
+    let headers = [
+        ("Métrica", METRIC_WIDTH),
+        ("DFS (avg)", ALGO_WIDTH),
+        ("BFS (avg)", ALGO_WIDTH),
     ];
 
     let sep: String = headers
@@ -163,20 +163,12 @@ pub fn print_comparison_table(left: &StatsSummary, right: &StatsSummary) {
         .join(" ");
     println!("{}\n{}", header_line, sep);
 
-    let row = |metric: &str, l: f64, r: f64, higher_is_better: bool| {
-        let better = if (higher_is_better && l > r) || (!higher_is_better && l < r) {
-            "DFS"
-        } else if (higher_is_better && r > l) || (!higher_is_better && r < l) {
-            "BFS"
-        } else {
-            "="
-        };
+    let row = |metric: &str, l: f64, r: f64| {
         println!(
-            "{} {} {} {}",
-            fmt_cell(24, metric),
-            fmt_cell(16, fmt_num(l)),
-            fmt_cell(16, fmt_num(r)),
-            fmt_cell(8, better),
+            "{} {} {}",
+            fmt_cell(METRIC_WIDTH, metric),
+            fmt_cell(ALGO_WIDTH, fmt_num(l)),
+            fmt_cell(ALGO_WIDTH, fmt_num(r)),
         );
     };
 
@@ -184,60 +176,46 @@ pub fn print_comparison_table(left: &StatsSummary, right: &StatsSummary) {
         "Tiempo por run (ms)",
         left.avg_duration_ms,
         right.avg_duration_ms,
-        false,
     );
     row(
         "Nodos explorados",
         left.avg_nodes_explored,
         right.avg_nodes_explored,
-        false,
     );
     row(
         "Nodos generados",
         left.avg_generated_nodes,
         right.avg_generated_nodes,
-        false,
     );
     row(
         "Encolados",
         left.avg_enqueued_nodes,
         right.avg_enqueued_nodes,
-        false,
     );
     row(
         "Descartes (duplicados)",
         left.avg_duplicates_pruned,
         right.avg_duplicates_pruned,
-        false,
     );
     row(
         "Longitud solución (movs)",
         left.avg_solution_moves,
         right.avg_solution_moves,
-        false,
     );
     row(
         "Pico frontera",
         left.avg_max_frontier,
         right.avg_max_frontier,
-        false,
     );
-    row(
-        "Frontera media",
-        left.avg_frontier,
-        right.avg_frontier,
-        false,
-    );
+    row("Frontera media", left.avg_frontier, right.avg_frontier);
     row(
         "Profundidad máx.",
         left.avg_max_depth_reached,
         right.avg_max_depth_reached,
-        false,
     );
     row(
         "Rendimiento (nodos/ms)",
         left.throughput_nodes_per_ms,
         right.throughput_nodes_per_ms,
-        true,
     );
 }

@@ -6,6 +6,9 @@ use Direction::*;
 
 pub const ALL_DIRECTIONS: [Direction; 4] = [Up, Down, Left, Right];
 const SOLVED_BOARD: u32 = 1985229328;
+const BOARD_SIDE: usize = 3;
+const BOARD_AREA: usize = BOARD_SIDE * BOARD_SIDE;
+const TILE_BIT_SIZE: usize = 4;
 
 #[derive(Clone, Copy)]
 pub enum Direction {
@@ -36,12 +39,12 @@ impl Board {
         board
     }
 
-    fn into_arr(self) -> [u8; 9] {
+    fn into_arr(self) -> [u8; BOARD_AREA] {
         let bits = self.0;
-        let mut arr = [0b0; 9];
+        let mut arr = [0b0; BOARD_AREA];
 
-        for val in 0..8 {
-            let pos = (bits.unbounded_shr(4 * val)) % 16;
+        for val in 0..(BOARD_AREA - 1) {
+            let pos = (bits.unbounded_shr((val * TILE_BIT_SIZE) as u32)) % (1 << TILE_BIT_SIZE);
             arr[pos as usize] = (val + 1) as u8;
         }
 
@@ -53,19 +56,20 @@ impl Board {
     }
 
     fn is_valid_movement(position: u32, direction: Direction) -> bool {
+        let position = position as usize;
         match direction {
-            Up => (position / 3) != 0,
-            Down => (position / 3) != 2,
-            Left => (position % 3) != 0,
-            Right => (position % 3) != 2,
+            Up => (position / BOARD_SIDE) != 0,
+            Down => (position / BOARD_SIDE) != BOARD_SIDE - 1,
+            Left => (position % BOARD_SIDE) != 0,
+            Right => (position % BOARD_SIDE) != BOARD_SIDE - 1,
         }
     }
 
     fn find_space_position(&self) -> u32 {
         let mut idx: u32 = 0;
 
-        for val in 0..8 {
-            let pos = (self.0.unbounded_shr(4 * val)) % 16;
+        for val in 0..(BOARD_AREA - 1) {
+            let pos = (self.0.unbounded_shr((val * TILE_BIT_SIZE) as u32)) % (1 << TILE_BIT_SIZE);
             idx |= 1 << pos;
         }
 
@@ -78,8 +82,8 @@ impl Board {
         }
 
         Ok(match direction {
-            Up => from - 3,
-            Down => from + 3,
+            Up => from - BOARD_SIDE as u32,
+            Down => from + BOARD_SIDE as u32,
             Left => from - 1,
             Right => from + 1,
         })
@@ -88,9 +92,11 @@ impl Board {
     fn get_value(&self, p: u32) -> u32 {
         let mut target_val = 0;
         let mut target_pos = 0;
-        for val in 0..8 {
-            target_val = val;
-            target_pos = (self.0.unbounded_shr(4 * val)) % 16;
+
+        for val in 0..(BOARD_AREA - 1) {
+            target_val = val as u32;
+            target_pos =
+                (self.0.unbounded_shr((TILE_BIT_SIZE * val) as u32)) % (1 << TILE_BIT_SIZE);
             if target_pos == p {
                 break;
             }
@@ -104,9 +110,10 @@ impl Board {
     }
 
     fn set_value(&mut self, p: u32, val: u32) {
-        let mask = 0b1111 << (4 * val);
+        let ones = (1 << TILE_BIT_SIZE) - 1;
+        let mask = ones << (TILE_BIT_SIZE as u32 * val);
         self.0 &= !mask;
-        self.0 |= p << (4 * val);
+        self.0 |= p << (TILE_BIT_SIZE as u32 * val);
     }
 
     pub fn move_space(mut self, direction: Direction) -> Result<Self, &'static str> {
@@ -130,7 +137,7 @@ impl Display for Board {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let arr = self.into_arr();
         for (i, val) in arr.iter().enumerate() {
-            if i % 3 == 0 && i != 0 {
+            if i % BOARD_SIDE == 0 && i != 0 {
                 writeln!(f)?;
             }
 

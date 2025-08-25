@@ -22,23 +22,33 @@ pub struct Solver {
     enqueued_nodes: usize,
     duplicates_pruned: usize,
     max_depth_reached: usize,
-    solve_duration_ms: f64,
+    solve_duration_ms: u128,
 }
 
 impl Solver {
+    pub fn solve(&mut self, board: Board) -> Option<Board> {
+        self.init_search(board);
+        let start = Instant::now();
+
+        while let Some(board) = self.get_next_board() {
+            self.mark_explored(board);
+            self.record_frontier_size();
+
+            if board.is_solved() {
+                return self.finish_with_solution(start, board);
+            }
+
+            self.expand_neighbors(board);
+        }
+
+        self.finish_without_solution(start);
+        None
+    }
+
     pub fn new(strategy: ExplorerStrategy) -> Solver {
         Self {
             strategy,
-            boards_to_check: LinkedList::new(),
-            boards_checked: HashSet::new(),
-            parents: HashMap::new(),
-            to_check_size: Vec::new(),
-            depth_by_board: HashMap::new(),
-            generated_nodes: 0,
-            enqueued_nodes: 0,
-            duplicates_pruned: 0,
-            max_depth_reached: 0,
-            solve_duration_ms: 0.0,
+            ..Default::default()
         }
     }
 
@@ -98,12 +108,12 @@ impl Solver {
     }
 
     fn finish_with_solution(&mut self, start: Instant, board: Board) -> Option<Board> {
-        self.solve_duration_ms = start.elapsed().as_secs_f64() * 1000.0;
+        self.solve_duration_ms = start.elapsed().as_millis();
         Some(board)
     }
 
     fn finish_without_solution(&mut self, start: Instant) {
-        self.solve_duration_ms = start.elapsed().as_secs_f64() * 1000.0;
+        self.solve_duration_ms = start.elapsed().as_millis();
     }
 
     fn enqueue_successor(&mut self, parent: Board, child: Board) {
@@ -121,7 +131,7 @@ impl Solver {
 
     fn process_move(&mut self, parent: Board, dir: crate::board::Direction) {
         if let Ok(child) = parent.move_space(dir) {
-            self.generated_nodes += 1; // valid successor generated
+            self.generated_nodes += 1;
             if !self.boards_checked.contains(&child) {
                 self.enqueue_successor(parent, child);
             } else {
@@ -134,24 +144,5 @@ impl Solver {
         for direction in &ALL_DIRECTIONS {
             self.process_move(board, *direction);
         }
-    }
-
-    pub fn solve(&mut self, board: Board) -> Option<Board> {
-        self.init_search(board);
-        let start = Instant::now();
-
-        while let Some(board) = self.get_next_board() {
-            self.mark_explored(board);
-            self.record_frontier_size();
-
-            if board.is_solved() {
-                return self.finish_with_solution(start, board);
-            }
-
-            self.expand_neighbors(board);
-        }
-
-        self.finish_without_solution(start);
-        None
     }
 }
