@@ -51,41 +51,41 @@ pub struct StatsSummary {
     pub throughput_nodes_per_ms: f64,
 }
 
-impl StatsSummary {
-    pub fn from_runs(strategy: ExplorerStrategy, runs: &[Stats]) -> Self {
-        let n = runs.len().max(1) as f64;
+impl From<&[Stats]> for StatsSummary {
+    fn from(value: &[Stats]) -> Self {
+        let n = value.len().max(1) as f64;
         let sum = |mut acc: f64, v: f64| {
             acc += v;
             acc
         };
 
-        let avg_nodes_explored = runs
+        let avg_nodes_explored = value
             .iter()
             .fold(0.0, |a, s| sum(a, s.nodes_explored as f64))
             / n;
-        let avg_solution_moves = runs
+        let avg_solution_moves = value
             .iter()
             .fold(0.0, |a, s| sum(a, s.solution_moves as f64))
             / n;
-        let avg_max_frontier = runs.iter().fold(0.0, |a, s| sum(a, s.max_frontier as f64)) / n;
-        let avg_frontier = runs.iter().fold(0.0, |a, s| sum(a, s.avg_frontier)) / n;
-        let avg_generated_nodes = runs
+        let avg_max_frontier = value.iter().fold(0.0, |a, s| sum(a, s.max_frontier as f64)) / n;
+        let avg_frontier = value.iter().fold(0.0, |a, s| sum(a, s.avg_frontier)) / n;
+        let avg_generated_nodes = value
             .iter()
             .fold(0.0, |a, s| sum(a, s.generated_nodes as f64))
             / n;
-        let avg_enqueued_nodes = runs
+        let avg_enqueued_nodes = value
             .iter()
             .fold(0.0, |a, s| sum(a, s.enqueued_nodes as f64))
             / n;
-        let avg_duplicates_pruned = runs
+        let avg_duplicates_pruned = value
             .iter()
             .fold(0.0, |a, s| sum(a, s.duplicates_pruned as f64))
             / n;
-        let avg_max_depth_reached = runs
+        let avg_max_depth_reached = value
             .iter()
             .fold(0.0, |a, s| sum(a, s.max_depth_reached as f64))
             / n;
-        let avg_duration_ms = runs.iter().fold(0.0, |a, s| sum(a, s.duration_ms)) / n;
+        let avg_duration_ms = value.iter().fold(0.0, |a, s| sum(a, s.duration_ms)) / n;
         let throughput_nodes_per_ms = if avg_duration_ms > 0.0 {
             avg_nodes_explored / avg_duration_ms
         } else {
@@ -93,8 +93,8 @@ impl StatsSummary {
         };
 
         Self {
-            strategy,
-            runs: runs.len(),
+            strategy: value.first().expect("No runs provided").strategy,
+            runs: value.len(),
             avg_nodes_explored,
             avg_solution_moves,
             avg_max_frontier,

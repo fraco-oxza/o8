@@ -1,59 +1,54 @@
-use rayon::prelude::*;
-use std::env;
+use clap::Parser;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
     board::Board,
     solver::{ExplorerStrategy, Solver},
-    stats::{Stats, StatsSummary, print_comparison_table},
+    stats::{Stats, print_comparison_table},
 };
 
 pub(crate) mod board;
 pub(crate) mod solver;
 pub(crate) mod stats;
 
+const DEFAULT_RUNS: usize = 200;
+const DEFAULT_SCRAMBLE_STEPS: usize = 200;
+
+#[derive(Parser, Debug)]
+struct Args {
+    #[arg(short, long, default_value_t = DEFAULT_RUNS)]
+    runs: usize,
+    #[arg(short, long, default_value_t = DEFAULT_SCRAMBLE_STEPS)]
+    scramble_steps: usize,
+}
+
+fn run_search(boards: &[Board], algo: ExplorerStrategy) -> Vec<Stats> {
+    boards
+        .par_iter()
+        .map(|b| {
+            let mut solver = Solver::new(algo);
+            solver.solve(*b).expect("No solution founded");
+            solver.get_solution_stats()
+        })
+        .collect()
+}
+
 fn main() {
-    // Configurable via env (fish/zsh/bash compatible): O8_RUNS, O8_SCRAMBLE_STEPS
-    let n: usize = env::var("O8_RUNS")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(200);
-    let scramble_steps: usize = env::var("O8_SCRAMBLE_STEPS")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(200);
+    let Args {
+        runs,
+        scramble_steps,
+    } = Args::parse();
 
     println!(
-        "Generando {n} tableros aleatorios con {scramble_steps} movimientos y comparando DFS vs BFS..."
+        "Generando {runs} tableros aleatorios con {scramble_steps} movimientos y comparando DFS vs BFS..."
     );
 
-    // Generar los mismos tableros para ambas estrategias
-    let boards: Vec<Board> = (0..n)
-        .into_par_iter()
+    let boards: Vec<Board> = (0..runs)
         .map(|_| Board::random_with_solution(scramble_steps))
         .collect();
 
-    // Ejecutar DFS
-    let dfs_run: Vec<Stats> = boards
-        .par_iter()
-        .map(|b| {
-            let mut solver = Solver::new(ExplorerStrategy::Dfs);
-            solver.solve(*b).expect("No solution founded");
-            solver.get_solution_stats()
-        })
-        .collect();
+    let dfs_run = run_search(&boards, ExplorerStrategy::Dfs);
+    let bfs_run = run_search(&boards, ExplorerStrategy::Bfs);
 
-    // Ejecutar BFS
-    let bfs_run: Vec<Stats> = boards
-        .par_iter()
-        .map(|b| {
-            let mut solver = Solver::new(ExplorerStrategy::Bfs);
-            solver.solve(*b).expect("No solution founded");
-            solver.get_solution_stats()
-        })
-        .collect();
-
-    let dfs_summary = StatsSummary::from_runs(ExplorerStrategy::Dfs, &dfs_run);
-    let bfs_summary = StatsSummary::from_runs(ExplorerStrategy::Bfs, &bfs_run);
-
-    print_comparison_table(&dfs_summary, &bfs_summary);
+    print_comparison_table(&dfs_run.as_slice().into(), &bfs_run.as_slice().into());
 }
