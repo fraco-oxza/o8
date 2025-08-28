@@ -3,6 +3,7 @@
 //! This module implements search algorithms for solving the 8-puzzle.
 //! It supports both Depth-First Search (DFS) and Breadth-First Search (BFS)
 //! strategies, providing detailed statistics about the search process.
+use clap::ValueEnum;
 
 use crate::board::{ALL_DIRECTIONS, Board};
 use crate::stats::Stats;
@@ -12,12 +13,12 @@ use std::time::Instant;
 /// Search strategy enumeration for the puzzle solver
 ///
 /// Determines the order in which nodes are explored during the search.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 pub enum ExplorerStrategy {
     /// Depth-First Search: explores as far as possible along each branch before backtracking
-    #[default]
     Dfs,
     /// Breadth-First Search: explores all neighbors at the current depth before moving deeper
+    #[default]
     Bfs,
 }
 

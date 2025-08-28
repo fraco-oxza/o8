@@ -7,6 +7,7 @@
 //! The goal is to arrange the tiles in numerical order by sliding them into the empty space.
 
 use clap::Parser;
+use clap::Subcommand;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
@@ -26,15 +27,31 @@ const DEFAULT_RUNS: usize = 200;
 const DEFAULT_SCRAMBLE_STEPS: usize = 200;
 
 /// Command-line arguments for the 8-puzzle solver
-#[derive(Parser, Debug)]
+#[derive(Parser)]
 struct Args {
-    /// Number of test runs to perform for each algorithm
-    #[arg(short, long, default_value_t = DEFAULT_RUNS)]
-    runs: usize,
+    #[command(subcommand)]
+    command: Commands,
+}
 
-    /// Number of scramble steps to generate random puzzle boards
-    #[arg(short, long, default_value_t = DEFAULT_SCRAMBLE_STEPS)]
-    scramble_steps: usize,
+#[derive(Subcommand)]
+enum Commands {
+    /// Runs multiple search and compares the results
+    Benchmark {
+        /// Number of test runs to perform for each algorithm
+        #[arg(short, long, default_value_t = DEFAULT_RUNS)]
+        runs: usize,
+        /// Number of scramble steps to generate random puzzle boards
+        #[arg(short, long, default_value_t = DEFAULT_SCRAMBLE_STEPS)]
+        scramble_steps: usize,
+    },
+    /// Runs one random board, solved it and show the path
+    SolveRandom {
+        #[arg(short, long, value_enum)]
+        algorithm: Option<ExplorerStrategy>,
+        /// Number of scramble steps to generate random puzzle boards
+        #[arg(short, long, default_value_t = DEFAULT_SCRAMBLE_STEPS)]
+        scramble_steps: usize,
+    },
 }
 
 /// Runs a search algorithm on a collection of boards in parallel
@@ -58,16 +75,8 @@ fn run_search(boards: &[Board], algo: ExplorerStrategy) -> Vec<Stats> {
         .collect()
 }
 
-/// Main function that orchestrates the 8-puzzle solver comparison
-///
-/// Generates random puzzle boards, solves them using both DFS and BFS algorithms,
-/// and displays a comparison table of the performance metrics.
-fn main() {
-    let Args {
-        runs,
-        scramble_steps,
-    } = Args::parse();
-
+/// Benchmarks the performance of DFS vs BFS on random puzzle boards
+fn benchmark(runs: usize, scramble_steps: usize) {
     println!(
         "Generating {runs} random boards with {scramble_steps} moves and comparing DFS vs BFS..."
     );
@@ -80,4 +89,41 @@ fn main() {
     let bfs_run = run_search(&boards, ExplorerStrategy::Bfs);
 
     print_comparison_table(&dfs_run.as_slice().into(), &bfs_run.as_slice().into());
+}
+
+/// Solves a single random puzzle board and displays the solution steps
+fn solve_random(scramble_steps: usize, algo: ExplorerStrategy) {
+    let board = Board::random_with_solution(scramble_steps);
+    let mut solver = Solver::new(algo);
+
+    solver.solve(board).expect("Not solution founded");
+
+    let solution = solver.step_by_step_solution();
+
+    for step in &solution {
+        println!("{}", "-".repeat(20));
+        println!("{step}");
+        println!("{}", "-".repeat(20));
+    }
+
+    println!("{:#?}", solver.get_solution_stats());
+}
+
+/// Main function that orchestrates the 8-puzzle solver comparison
+///
+/// Generates random puzzle boards, solves them using both DFS and BFS algorithms,
+/// and displays a comparison table of the performance metrics.
+fn main() {
+    let Args { command } = Args::parse();
+
+    match command {
+        Commands::Benchmark {
+            runs,
+            scramble_steps,
+        } => benchmark(runs, scramble_steps),
+        Commands::SolveRandom {
+            algorithm,
+            scramble_steps,
+        } => solve_random(scramble_steps, algorithm.unwrap_or_default()),
+    }
 }
