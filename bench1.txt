@@ -1,0 +1,14 @@
+Strategy Comparison (runs: 5000)
+
+Metric                   DFS (avg)        BFS (avg)        HTC (avg)       
+------------------------ ---------------- ---------------- ----------------
+Time per run (ms)        119.86           255.84           0.06            
+Nodes explored           65776            94319            306.41          
+Nodes generated          183828           507635           836.67          
+Enqueued                 107655           233661           523.43          
+Discards (duplicates)    76172            273974           313.24          
+Solution length (moves)  61369            22.03            66.42           
+Peak frontier            41890            51170            215.55          
+Average frontier         22348            31957            108.34          
+Max depth                61407            23.03            70.62           
+Throughput (nodes/ms)    548.78           368.66           5040  

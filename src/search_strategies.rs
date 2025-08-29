@@ -1,4 +1,7 @@
-use std::collections::LinkedList;
+use std::{
+    cmp::Reverse,
+    collections::{BinaryHeap, LinkedList},
+};
 
 use crate::solver::ExplorerStrategy;
 
@@ -37,5 +40,22 @@ impl<T> SearchStrategy<T> for SimpleSearchStrategy<T> {
 
     fn len(&self) -> usize {
         self.nodes.len()
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct HeuristicSearchStrategy<T: Ord + PartialOrd>(BinaryHeap<T>);
+
+impl<T: Ord + PartialOrd> SearchStrategy<T> for HeuristicSearchStrategy<Reverse<T>> {
+    fn get_next(&mut self) -> Option<T> {
+        self.0.pop().map(|b| b.0)
+    }
+
+    fn enqueue(&mut self, node: T) {
+        self.0.push(Reverse(node));
+    }
+
+    fn len(&self) -> usize {
+        self.0.len()
     }
 }

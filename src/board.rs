@@ -43,7 +43,7 @@
 //!
 //! This gives us the magic number: `SOLVED_BOARD = 1985229328`
 
-use std::fmt::Display;
+use std::{cmp::Ordering, fmt::Display};
 
 use rand::{rng, seq::IndexedRandom};
 
@@ -436,6 +436,19 @@ impl Board {
     }
 }
 
+impl PartialOrd for Board {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Board {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.heuristic_distance_to_solution()
+            .cmp(&other.heuristic_distance_to_solution())
+    }
+}
+
 /// Default implementation creates a solved board state
 impl Default for Board {
     fn default() -> Self {
@@ -449,7 +462,9 @@ impl Default for Board {
 /// represented by three spaces.
 impl Display for Board {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{}", self.heuristic_distance_to_solution())?;
         let arr = self.into_arr();
+
         for (i, val) in arr.iter().enumerate() {
             if i % BOARD_SIDE == 0 && i != 0 {
                 writeln!(f)?;
@@ -461,6 +476,7 @@ impl Display for Board {
                 write!(f, "   ")?;
             }
         }
+
         Ok(())
     }
 }

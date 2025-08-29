@@ -198,7 +198,7 @@ fn fmt_num(n: f64) -> String {
 ///
 /// * `left` - Statistics summary for the first strategy
 /// * `right` - Statistics summary for the second strategy
-pub fn print_comparison_table(left: &StatsSummary, right: &StatsSummary) {
+pub fn print_comparison_table(left: &StatsSummary, right: &StatsSummary, other: &StatsSummary) {
     let title = format!("Strategy Comparison (runs: {})", left.runs);
     println!("\n{title}\n");
 
@@ -206,6 +206,7 @@ pub fn print_comparison_table(left: &StatsSummary, right: &StatsSummary) {
         ("Metric", METRIC_WIDTH),
         ("DFS (avg)", ALGO_WIDTH),
         ("BFS (avg)", ALGO_WIDTH),
+        ("HTC (avg)", ALGO_WIDTH),
     ];
 
     let sep: String = headers
@@ -221,12 +222,13 @@ pub fn print_comparison_table(left: &StatsSummary, right: &StatsSummary) {
         .join(" ");
     println!("{}\n{}", header_line, sep);
 
-    let row = |metric: &str, l: f64, r: f64| {
+    let row = |metric: &str, l: f64, r: f64, o: f64| {
         println!(
-            "{} {} {}",
+            "{} {} {} {}",
             fmt_cell(METRIC_WIDTH, metric),
             fmt_cell(ALGO_WIDTH, fmt_num(l)),
             fmt_cell(ALGO_WIDTH, fmt_num(r)),
+            fmt_cell(ALGO_WIDTH, fmt_num(o))
         );
     };
 
@@ -234,46 +236,60 @@ pub fn print_comparison_table(left: &StatsSummary, right: &StatsSummary) {
         "Time per run (ms)",
         left.avg_duration_ms,
         right.avg_duration_ms,
+        other.avg_duration_ms,
     );
     row(
         "Nodes explored",
         left.avg_nodes_explored,
         right.avg_nodes_explored,
+        other.avg_nodes_explored,
     );
     row(
         "Nodes generated",
         left.avg_generated_nodes,
         right.avg_generated_nodes,
+        other.avg_generated_nodes,
     );
     row(
         "Enqueued",
         left.avg_enqueued_nodes,
         right.avg_enqueued_nodes,
+        other.avg_enqueued_nodes,
     );
     row(
         "Discards (duplicates)",
         left.avg_duplicates_pruned,
         right.avg_duplicates_pruned,
+        other.avg_duplicates_pruned,
     );
     row(
         "Solution length (moves)",
         left.avg_solution_moves,
         right.avg_solution_moves,
+        other.avg_solution_moves,
     );
     row(
         "Peak frontier",
         left.avg_max_frontier,
         right.avg_max_frontier,
+        other.avg_max_frontier,
     );
-    row("Average frontier", left.avg_frontier, right.avg_frontier);
+    row(
+        "Average frontier",
+        left.avg_frontier,
+        right.avg_frontier,
+        other.avg_frontier,
+    );
     row(
         "Max depth",
         left.avg_max_depth_reached,
         right.avg_max_depth_reached,
+        other.avg_max_depth_reached,
     );
     row(
         "Throughput (nodes/ms)",
         left.throughput_nodes_per_ms,
         right.throughput_nodes_per_ms,
+        other.throughput_nodes_per_ms,
     );
 }

@@ -8,8 +8,10 @@
 
 use clap::Parser;
 use clap::Subcommand;
+use clap::ValueEnum;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
+use crate::search_strategies::HeuristicSearchStrategy;
 use crate::search_strategies::SearchStrategy;
 use crate::search_strategies::SimpleSearchStrategy;
 use crate::{
@@ -28,6 +30,16 @@ const DEFAULT_RUNS: usize = 200;
 
 /// Default number of scramble steps to generate random boards
 const DEFAULT_SCRAMBLE_STEPS: usize = 200;
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+enum SolveAlgorithm {
+    /// Depth-First Search: explores as far as possible along each branch before backtracking
+    Dfs,
+    /// Breadth-First Search: explores all neighbors at the current depth before moving deeper
+    Bfs,
+    #[default]
+    Heuristic,
+}
 
 /// Command-line arguments for the 8-puzzle solver
 #[derive(Parser)]
@@ -50,7 +62,7 @@ enum Commands {
     /// Runs one random board, solved it and show the path
     SolveRandom {
         #[arg(short, long, value_enum)]
-        algorithm: Option<ExplorerStrategy>,
+        algorithm: Option<SolveAlgorithm>,
         /// Number of scramble steps to generate random puzzle boards
         #[arg(short, long, default_value_t = DEFAULT_SCRAMBLE_STEPS)]
         scramble_steps: usize,
@@ -99,17 +111,20 @@ fn benchmark(runs: usize, scramble_steps: usize) {
         &boards,
         Solver::new(SimpleSearchStrategy::new(ExplorerStrategy::Bfs)),
     );
+    let etc = run_search(&boards, Solver::new(HeuristicSearchStrategy::default()));
 
-    print_comparison_table(&dfs_run.as_slice().into(), &bfs_run.as_slice().into());
+    print_comparison_table(
+        &dfs_run.as_slice().into(),
+        &bfs_run.as_slice().into(),
+        &etc.as_slice().into(),
+    );
 }
 
-/// Solves a single random puzzle board and displays the solution steps
-fn solve_random(scramble_steps: usize, algo: ExplorerStrategy) {
-    let board = Board::random_with_solution(scramble_steps);
-    let mut solver = Solver::new(SimpleSearchStrategy::new(algo));
-
+fn solve_one<T>(board: Board, mut solver: Solver<T>)
+where
+    T: SearchStrategy<Board> + Clone + Default,
+{
     solver.solve(board).expect("Not solution founded");
-
     let solution = solver.step_by_step_solution();
 
     for step in &solution {
@@ -119,6 +134,25 @@ fn solve_random(scramble_steps: usize, algo: ExplorerStrategy) {
     }
 
     println!("{:#?}", solver.get_solution_stats());
+}
+
+/// Solves a single random puzzle board and displays the solution steps
+fn solve_random(scramble_steps: usize, algo: SolveAlgorithm) {
+    let board = Board::random_with_solution(scramble_steps);
+
+    match algo {
+        SolveAlgorithm::Dfs => solve_one(
+            board,
+            Solver::new(SimpleSearchStrategy::new(ExplorerStrategy::Dfs)),
+        ),
+        SolveAlgorithm::Bfs => solve_one(
+            board,
+            Solver::new(SimpleSearchStrategy::new(ExplorerStrategy::Bfs)),
+        ),
+        SolveAlgorithm::Heuristic => {
+            solve_one(board, Solver::new(HeuristicSearchStrategy::default()))
+        }
+    };
 }
 
 /// Main function that orchestrates the 8-puzzle solver comparison
