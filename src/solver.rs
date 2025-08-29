@@ -6,8 +6,9 @@
 use clap::ValueEnum;
 
 use crate::board::{ALL_DIRECTIONS, Board};
+use crate::search_strategies::SearchStrategy;
 use crate::stats::Stats;
-use std::collections::{HashMap, HashSet, LinkedList};
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 /// Search strategy enumeration for the puzzle solver
@@ -27,16 +28,16 @@ pub enum ExplorerStrategy {
 /// The solver uses either DFS or BFS to find a solution path from any given
 /// board state to the solved state. It maintains detailed statistics about
 /// the search process including nodes explored, frontier size, and timing.
-#[derive(Default)]
-pub struct Solver {
-    /// The search strategy being used
-    strategy: ExplorerStrategy,
-    /// Queue/stack of boards to be explored
-    boards_to_check: LinkedList<Board>,
+#[derive(Default, Clone)]
+pub struct Solver<T>
+where
+    T: Default + Clone,
+{
     /// Parent relationships for reconstructing the solution path
     parents: HashMap<Board, Board>,
     /// Set of already explored board states
     boards_checked: HashSet<Board>,
+    boards_to_check: T,
     /// History of frontier sizes throughout the search
     to_check_size: Vec<usize>,
     /// Depth of each board state in the search tree
@@ -53,7 +54,10 @@ pub struct Solver {
     solve_duration_ms: u128,
 }
 
-impl Solver {
+impl<T> Solver<T>
+where
+    T: SearchStrategy<Board> + Default + Clone,
+{
     /// Solves the puzzle using the configured search strategy
     ///
     /// # Arguments
@@ -67,7 +71,7 @@ impl Solver {
         self.init_search(board);
         let start = Instant::now();
 
-        while let Some(board) = self.get_next_board() {
+        while let Some(board) = self.boards_to_check.get_next() {
             self.mark_explored(board);
             self.record_frontier_size();
 
@@ -91,9 +95,9 @@ impl Solver {
     /// # Returns
     ///
     /// A new solver instance ready to solve puzzles
-    pub fn new(strategy: ExplorerStrategy) -> Solver {
+    pub fn new(search_strategy: T) -> Solver<T> {
         Self {
-            strategy,
+            boards_to_check: search_strategy,
             ..Default::default()
         }
     }
@@ -112,7 +116,6 @@ impl Solver {
         let solution_moves = self.step_by_step_solution().len().saturating_sub(1);
 
         Stats {
-            strategy: self.strategy,
             nodes_explored: self.boards_checked.len(),
             solution_moves,
             max_frontier,
@@ -146,28 +149,13 @@ impl Solver {
         solution
     }
 
-    /// Gets the next board to explore based on the search strategy
-    ///
-    /// - DFS: Takes from the back (stack behavior)
-    /// - BFS: Takes from the front (queue behavior)
-    ///
-    /// # Returns
-    ///
-    /// The next board to explore, or `None` if no more boards remain
-    pub fn get_next_board(&mut self) -> Option<Board> {
-        match self.strategy {
-            ExplorerStrategy::Bfs => self.boards_to_check.pop_front(),
-            ExplorerStrategy::Dfs => self.boards_to_check.pop_back(),
-        }
-    }
-
     /// Initializes the search with the starting board state
     ///
     /// # Arguments
     ///
     /// * `start` - The initial board state to begin searching from
     fn init_search(&mut self, start: Board) {
-        self.boards_to_check.push_back(start);
+        self.boards_to_check.enqueue(start);
         self.depth_by_board.insert(start, 0);
     }
 
@@ -218,7 +206,7 @@ impl Solver {
     /// * `parent` - The parent board state
     /// * `child` - The successor board state to enqueue
     fn enqueue_successor(&mut self, parent: Board, child: Board) {
-        self.boards_to_check.push_back(child);
+        self.boards_to_check.enqueue(child);
         self.enqueued_nodes += 1;
         self.parents.insert(child, parent);
 

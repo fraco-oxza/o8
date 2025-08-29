@@ -10,6 +10,8 @@ use clap::Parser;
 use clap::Subcommand;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
+use crate::search_strategies::SearchStrategy;
+use crate::search_strategies::SimpleSearchStrategy;
 use crate::{
     board::Board,
     solver::{ExplorerStrategy, Solver},
@@ -17,6 +19,7 @@ use crate::{
 };
 
 pub(crate) mod board;
+pub(crate) mod search_strategies;
 pub(crate) mod solver;
 pub(crate) mod stats;
 
@@ -64,11 +67,14 @@ enum Commands {
 /// # Returns
 ///
 /// A vector of statistics for each solved board
-fn run_search(boards: &[Board], algo: ExplorerStrategy) -> Vec<Stats> {
+fn run_search<T>(boards: &[Board], solver: Solver<T>) -> Vec<Stats>
+where
+    T: SearchStrategy<board::Board> + Default + Send + Sync + Clone,
+{
     boards
         .par_iter()
         .map(|b| {
-            let mut solver = Solver::new(algo);
+            let mut solver = solver.clone();
             solver.solve(*b).expect("No solution found");
             solver.get_solution_stats()
         })
@@ -85,8 +91,14 @@ fn benchmark(runs: usize, scramble_steps: usize) {
         .map(|_| Board::random_with_solution(scramble_steps))
         .collect();
 
-    let dfs_run = run_search(&boards, ExplorerStrategy::Dfs);
-    let bfs_run = run_search(&boards, ExplorerStrategy::Bfs);
+    let dfs_run = run_search(
+        &boards,
+        Solver::new(SimpleSearchStrategy::new(ExplorerStrategy::Dfs)),
+    );
+    let bfs_run = run_search(
+        &boards,
+        Solver::new(SimpleSearchStrategy::new(ExplorerStrategy::Bfs)),
+    );
 
     print_comparison_table(&dfs_run.as_slice().into(), &bfs_run.as_slice().into());
 }
@@ -94,7 +106,7 @@ fn benchmark(runs: usize, scramble_steps: usize) {
 /// Solves a single random puzzle board and displays the solution steps
 fn solve_random(scramble_steps: usize, algo: ExplorerStrategy) {
     let board = Board::random_with_solution(scramble_steps);
-    let mut solver = Solver::new(algo);
+    let mut solver = Solver::new(SimpleSearchStrategy::new(algo));
 
     solver.solve(board).expect("Not solution founded");
 

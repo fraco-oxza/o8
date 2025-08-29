@@ -1,13 +1,11 @@
 //! # Statistics Module
-//! 
+//!
 //! This module provides comprehensive statistics collection and reporting
 //! for the 8-puzzle solver performance analysis. It tracks various metrics
 //! during the search process and provides formatted output for comparison
 //! between different search strategies.
 
 use std::fmt::{self, Display};
-
-use crate::solver::ExplorerStrategy;
 
 /// Width for metric column in comparison table
 const METRIC_WIDTH: usize = 24;
@@ -16,13 +14,11 @@ const METRIC_WIDTH: usize = 24;
 const ALGO_WIDTH: usize = 16;
 
 /// Individual statistics for a single puzzle solve
-/// 
+///
 /// Contains detailed metrics about the search process for one puzzle instance,
 /// including performance data, search space exploration, and solution quality.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Stats {
-    /// The search strategy used (DFS or BFS)
-    pub strategy: ExplorerStrategy,
     /// Total number of board states explored
     pub nodes_explored: usize,
     /// Number of moves in the optimal solution found
@@ -47,8 +43,7 @@ impl Display for Stats {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{:?}: explored={}, moves={}, max_frontier={}, avg_frontier={:.2}, gen={}, enq={}, pruned={}, max_depth={}, time={:.3}ms",
-            self.strategy,
+            "explored={}, moves={}, max_frontier={}, avg_frontier={:.2}, gen={}, enq={}, pruned={}, max_depth={}, time={:.3}ms",
             self.nodes_explored,
             self.solution_moves,
             self.max_frontier,
@@ -63,13 +58,11 @@ impl Display for Stats {
 }
 
 /// Aggregated statistics summary for multiple puzzle runs
-/// 
+///
 /// Provides averaged metrics across multiple puzzle solves for comparing
 /// the overall performance characteristics of different search strategies.
 #[derive(Clone, Debug, Default)]
 pub struct StatsSummary {
-    /// The search strategy these statistics represent
-    pub strategy: ExplorerStrategy,
     /// Number of puzzle instances included in this summary
     pub runs: usize,
     /// Average number of board states explored per run
@@ -137,7 +130,6 @@ impl From<&[Stats]> for StatsSummary {
         };
 
         Self {
-            strategy: value.first().expect("No runs provided").strategy,
             runs: value.len(),
             avg_nodes_explored,
             avg_solution_moves,
@@ -154,14 +146,14 @@ impl From<&[Stats]> for StatsSummary {
 }
 
 /// Formats a cell in the comparison table with proper padding
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `width` - The desired width of the cell
 /// * `val` - The value to display in the cell
-/// 
+///
 /// # Returns
-/// 
+///
 /// A string padded to the specified width
 fn fmt_cell(width: usize, val: impl Into<String>) -> String {
     let s = val.into();
@@ -177,13 +169,13 @@ fn fmt_cell(width: usize, val: impl Into<String>) -> String {
 }
 
 /// Formats a numeric value for display in the comparison table
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `n` - The numeric value to format
-/// 
+///
 /// # Returns
-/// 
+///
 /// A formatted string with appropriate precision
 fn fmt_num(n: f64) -> String {
     if n.is_finite() {
@@ -198,19 +190,16 @@ fn fmt_num(n: f64) -> String {
 }
 
 /// Prints a formatted comparison table of two search strategies
-/// 
+///
 /// Displays a comprehensive side-by-side comparison of performance metrics
 /// for two different search strategies (typically DFS vs BFS).
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `left` - Statistics summary for the first strategy
 /// * `right` - Statistics summary for the second strategy
 pub fn print_comparison_table(left: &StatsSummary, right: &StatsSummary) {
-    let title = format!(
-        "Strategy Comparison (runs: {}, {:?} vs {:?})",
-        left.runs, left.strategy, right.strategy
-    );
+    let title = format!("Strategy Comparison (runs: {})", left.runs);
     println!("\n{title}\n");
 
     let headers = [

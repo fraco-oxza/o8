@@ -140,15 +140,15 @@ impl Board {
         let mut board = Board::default();
         let mut rng = rng();
 
-        (0..steps).for_each(|_| {
-            let _ = board
-                .move_space(
-                    *ALL_DIRECTIONS
-                        .choose(&mut rng)
-                        .expect("This should never happen"),
-                )
-                .map(|b| board = b);
-        });
+        for _ in 0..steps {
+            let direction = *ALL_DIRECTIONS
+                .choose(&mut rng)
+                .expect("This should never happen");
+
+            if let Ok(b) = board.move_space(direction) {
+                board = b;
+            }
+        }
 
         board
     }
@@ -182,13 +182,12 @@ impl Board {
     /// A 9-element array where each position contains the tile number,
     /// with 0 representing the empty space
     fn into_arr(self) -> [u8; BOARD_AREA] {
-        let bits = self.0;
-        let mut arr = [0b0; BOARD_AREA];
+        let mut arr = [0; BOARD_AREA];
 
         // For each tile (0-7 representing tiles 1-8)
-        for val in 0..(BOARD_AREA - 1) {
+        for val in 0..(BOARD_AREA as u32 - 1) {
             // Extract the 4-bit position field for this tile
-            let pos = (bits.unbounded_shr((val * TILE_BIT_SIZE) as u32)) % (1 << TILE_BIT_SIZE);
+            let pos = self.get_pos(val);
             // Place the tile number (val + 1) at its encoded position
             arr[pos as usize] = (val + 1) as u8;
         }
@@ -258,8 +257,8 @@ impl Board {
         let mut idx: u32 = 0;
 
         // Build bitmask of occupied positions
-        for val in 0..(BOARD_AREA - 1) {
-            let pos = (self.0.unbounded_shr((val * TILE_BIT_SIZE) as u32)) % (1 << TILE_BIT_SIZE);
+        for val in 0..(BOARD_AREA as u32 - 1) {
+            let pos = self.get_pos(val);
             idx |= 1 << pos; // Set bit at position 'pos'
         }
 
@@ -327,11 +326,9 @@ impl Board {
         let mut target_pos = 0;
 
         // Search through all tiles to find which one is at position 'p'
-        for val in 0..(BOARD_AREA - 1) {
-            target_val = val as u32;
-            // Extract position for tile 'val' from its 4-bit field
-            target_pos =
-                (self.0.unbounded_shr((TILE_BIT_SIZE * val) as u32)) % (1 << TILE_BIT_SIZE);
+        for val in 0..(BOARD_AREA as u32 - 1) {
+            target_val = val;
+            target_pos = self.get_pos(val);
             if target_pos == p {
                 break; // Found the tile at position 'p'
             }
@@ -406,6 +403,36 @@ impl Board {
         self.set_value(space_position, digit_to_move);
 
         Ok(self)
+    }
+
+    fn get_pos(&self, value: u32) -> u32 {
+        self.0.unbounded_shr(TILE_BIT_SIZE as u32 * value) % (1 << TILE_BIT_SIZE)
+    }
+
+    pub fn heuristic_distance_to_solution(&self) -> usize {
+        let solution = Self::default();
+        let mut distance = 0;
+
+        for val in 0..(BOARD_AREA as u32 - 1) {
+            distance += Self::manhattan_distance(
+                solution.get_pos(val) as isize,
+                self.get_pos(val) as isize,
+            );
+        }
+
+        distance += Self::manhattan_distance(
+            solution.find_space_position() as isize,
+            self.find_space_position() as isize,
+        );
+
+        distance
+    }
+
+    fn manhattan_distance(pos1: isize, pos2: isize) -> usize {
+        let hdis = (pos2 % BOARD_SIDE as isize) - (pos1 % BOARD_SIDE as isize);
+        let vdis = (pos2 / BOARD_SIDE as isize) - (pos1 / BOARD_SIDE as isize);
+
+        (hdis.abs() + vdis.abs()) as usize
     }
 }
 
