@@ -78,10 +78,10 @@ where
             self.record_frontier_size();
 
             if board.0.is_solved() {
-                return self.finish_with_solution(start, board.0);
+                return Some(self.finish_with_solution(start, board.0));
             }
 
-            self.expand_neighbors(board);
+            self.expand_neighbors(&board);
         }
 
         self.finish_without_solution(start);
@@ -185,9 +185,9 @@ where
     /// # Returns
     ///
     /// The solved board state
-    fn finish_with_solution(&mut self, start: Instant, board: Board) -> Option<Board> {
+    fn finish_with_solution(&mut self, start: Instant, board: Board) -> Board {
         self.solve_duration_ms = start.elapsed().as_millis();
-        Some(board)
+        board
     }
 
     /// Completes the search when no solution is found
@@ -207,17 +207,19 @@ where
     ///
     /// * `parent` - The parent board state
     /// * `child` - The successor board state to enqueue
-    fn enqueue_successor(&mut self, parent: BoardWithSteps, child: BoardWithSteps) {
-        self.boards_to_check.enqueue(child.clone());
+    fn enqueue_successor(&mut self, parent: &BoardWithSteps, child: BoardWithSteps) {
         self.enqueued_nodes += 1;
         self.parents.insert(child.0, parent.0);
 
         let parent_depth = *self.depth_by_board.get(&parent.0).unwrap_or(&0);
         let depth = parent_depth + 1;
         self.depth_by_board.insert(child.0, depth);
+
         if depth > self.max_depth_reached {
             self.max_depth_reached = depth;
         }
+
+        self.boards_to_check.enqueue(child);
     }
 
     /// Processes a single move attempt from a parent board
@@ -228,13 +230,13 @@ where
     ///
     /// * `parent` - The parent board state
     /// * `dir` - The direction to move the empty space
-    fn process_move(&mut self, parent: BoardWithSteps, dir: crate::board::Direction) {
+    fn process_move(&mut self, parent: &BoardWithSteps, dir: crate::board::Direction) {
         if let Ok(child) = parent.0.move_space(dir) {
             self.generated_nodes += 1;
-            if !self.boards_checked.contains(&child) {
-                self.enqueue_successor(parent.clone(), BoardWithSteps(child, parent.1 + 1));
-            } else {
+            if self.boards_checked.contains(&child) {
                 self.duplicates_pruned += 1;
+            } else {
+                self.enqueue_successor(parent, BoardWithSteps(child, parent.1 + 1));
             }
         }
     }
@@ -247,9 +249,9 @@ where
     /// # Arguments
     ///
     /// * `board` - The current board state to expand
-    fn expand_neighbors(&mut self, board: BoardWithSteps) {
+    fn expand_neighbors(&mut self, board: &BoardWithSteps) {
         for direction in &ALL_DIRECTIONS {
-            self.process_move(board.clone(), *direction);
+            self.process_move(board, *direction);
         }
     }
 }

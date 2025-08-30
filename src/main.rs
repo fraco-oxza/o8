@@ -15,6 +15,7 @@
 //! - `solve-random`: Scramble a solved board and print the step-by-step solution with the chosen strategy.
 //!
 //! See the project README or run with `--help` for full details.
+#![warn(clippy::pedantic)]
 
 use clap::Parser;
 use clap::Subcommand;
@@ -98,7 +99,7 @@ enum Commands {
 /// # Returns
 ///
 /// A vector of statistics for each solved board
-fn run_search<T>(boards: &[Board], solver: Solver<T>) -> Vec<Stats>
+fn run_search<T>(boards: &[Board], solver: &Solver<T>) -> Vec<Stats>
 where
     T: SearchStrategy<board::BoardWithSteps> + Default + Send + Sync + Clone,
 {
@@ -116,7 +117,7 @@ where
 /// Benchmark the performance of the available strategies on random boards
 fn benchmark(runs: usize, scramble_steps: usize, threads: Option<usize>) {
     println!(
-    "Generating {runs} random boards with {scramble_steps} moves and comparing strategies..."
+        "Generating {runs} random boards with {scramble_steps} moves and comparing strategies..."
     );
 
     if let Some(t) = threads {
@@ -134,15 +135,15 @@ fn benchmark(runs: usize, scramble_steps: usize, threads: Option<usize>) {
     println!("Running DFS...");
     let dfs_run = run_search(
         &boards,
-        Solver::new(SimpleSearchStrategy::new(ExplorerStrategy::Dfs)),
+        &Solver::new(SimpleSearchStrategy::new(ExplorerStrategy::Dfs)),
     );
     println!("Running BFS...");
     let bfs_run = run_search(
         &boards,
-        Solver::new(SimpleSearchStrategy::new(ExplorerStrategy::Bfs)),
+        &Solver::new(SimpleSearchStrategy::new(ExplorerStrategy::Bfs)),
     );
     println!("Running Heuristic Search (A*-style) ...");
-    let etc = run_search(&boards, Solver::new(HeuristicSearchStrategy::default()));
+    let etc = run_search(&boards, &Solver::new(HeuristicSearchStrategy::default()));
 
     print_comparison_table(
         &dfs_run.as_slice().into(),
@@ -186,9 +187,9 @@ fn solve_random(scramble_steps: usize, algo: SolveAlgorithm) {
             Solver::new(SimpleSearchStrategy::new(ExplorerStrategy::Bfs)),
         ),
         SolveAlgorithm::Heuristic => {
-            solve_one(board, Solver::new(HeuristicSearchStrategy::default()))
+            solve_one(board, Solver::new(HeuristicSearchStrategy::default()));
         }
-    };
+    }
 }
 
 /// Main function that orchestrates the 8-puzzle solver comparison

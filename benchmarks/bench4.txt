@@ -1,0 +1,20 @@
+Generating 200 random boards with 200 moves and comparing strategies...
+Running DFS...
+Running BFS...
+Running Heuristic Search (A*-style) ...
+
+Strategy Comparison (runs: 200, Dfs vs Bfs vs Heuristic)
+
+╭─────────────────────────┬───────────┬───────────┬─────────────────╮
+│ Metric                  ┆ DFS (avg) ┆ BFS (avg) ┆ Heuristic (avg) │
+╞═════════════════════════╪═══════════╪═══════════╪═════════════════╡
+│ Time per run (ms)       ┆     49.87 ┆     89.19 ┆            0.90 │
+│ Nodes explored          ┆     60622 ┆     65967 ┆            1217 │
+│ Nodes generated         ┆    169451 ┆    332540 ┆            3376 │
+│ Enqueued                ┆     99453 ┆    158413 ┆            2014 │
+│ Discards (duplicates)   ┆     69998 ┆    174127 ┆            1361 │
+│ Solution length (moves) ┆     56716 ┆     19.94 ┆           20.02 │
+│ Peak frontier           ┆     38831 ┆     37936 ┆          759.26 │
+│ Average frontier        ┆     20658 ┆     23032 ┆          384.65 │
+│ Max depth               ┆     56722 ┆     20.94 ┆           20.07 │
+╰─────────────────────────┴───────────┴───────────┴─────────────────╯

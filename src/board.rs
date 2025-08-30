@@ -47,22 +47,22 @@ use std::{cmp::Ordering, fmt::Display};
 
 use rand::{rng, seq::IndexedRandom};
 
-use Direction::*;
+use Direction::{Down, Left, Right, Up};
 
 /// Array containing all possible movement directions
 pub const ALL_DIRECTIONS: [Direction; 4] = [Up, Down, Left, Right];
 
 /// The solved board state represented as a 32-bit integer
-const SOLVED_BOARD: u32 = 1985229328;
+const SOLVED_BOARD: u32 = 1_985_229_328;
 
 /// The side length of the square board (3x3 grid)
-const BOARD_SIDE: usize = 3;
+const BOARD_SIDE: u8 = 3;
 
 /// The total number of positions on the board (9 positions)
-const BOARD_AREA: usize = BOARD_SIDE * BOARD_SIDE;
+const BOARD_AREA: u8 = BOARD_SIDE * BOARD_SIDE;
 
 /// Number of bits used to represent each tile position
-const TILE_BIT_SIZE: usize = 4;
+const TILE_BIT_SIZE: u8 = 4;
 
 /// Represents the four possible directions for moving tiles in the puzzle
 #[derive(Clone, Copy)]
@@ -181,15 +181,15 @@ impl Board {
     ///
     /// A 9-element array where each position contains the tile number,
     /// with 0 representing the empty space
-    fn into_arr(self) -> [u8; BOARD_AREA] {
-        let mut arr = [0; BOARD_AREA];
+    fn into_arr(self) -> [u8; BOARD_AREA as usize] {
+        let mut arr = [0; BOARD_AREA as usize];
 
         // For each tile (0-7 representing tiles 1-8)
-        for val in 0..(BOARD_AREA as u32 - 1) {
+        for val in 0..(BOARD_AREA - 1) {
             // Extract the 4-bit position field for this tile
             let pos = self.get_pos(val);
             // Place the tile number (val + 1) at its encoded position
-            arr[pos as usize] = (val + 1) as u8;
+            arr[pos as usize] = val + 1;
         }
 
         arr
@@ -200,7 +200,7 @@ impl Board {
     /// # Returns
     ///
     /// `true` if the board is solved (tiles are in numerical order), `false` otherwise
-    pub fn is_solved(&self) -> bool {
+    pub fn is_solved(self) -> bool {
         self.0 == SOLVED_BOARD
     }
 
@@ -214,8 +214,7 @@ impl Board {
     /// # Returns
     ///
     /// `true` if the movement is valid, `false` if it would move outside the board
-    fn is_valid_movement(position: u32, direction: Direction) -> bool {
-        let position = position as usize;
+    fn is_valid_movement(position: u8, direction: Direction) -> bool {
         match direction {
             Up => (position / BOARD_SIDE) != 0,
             Down => (position / BOARD_SIDE) != BOARD_SIDE - 1,
@@ -253,17 +252,19 @@ impl Board {
     /// # Returns
     ///
     /// The position (0-8) of the empty space
-    fn find_space_position(&self) -> u32 {
+    fn find_space_position(self) -> u8 {
         let mut idx: u32 = 0;
 
         // Build bitmask of occupied positions
-        for val in 0..(BOARD_AREA as u32 - 1) {
+        for val in 0..(BOARD_AREA - 1) {
             let pos = self.get_pos(val);
             idx |= 1 << pos; // Set bit at position 'pos'
         }
 
         // Find first unset bit (empty position)
         idx.trailing_ones()
+            .try_into()
+            .expect("Should be less than 256")
     }
 
     /// Calculates the new position after moving in a specific direction
@@ -276,14 +277,14 @@ impl Board {
     /// # Returns
     ///
     /// `Ok(new_position)` if the move is valid, or an error message if invalid
-    fn calculate_new_position(from: u32, direction: Direction) -> Result<u32, &'static str> {
+    fn calculate_new_position(from: u8, direction: Direction) -> Result<u8, &'static str> {
         if !Board::is_valid_movement(from, direction) {
             return Err("Invalid move: cannot move space in that direction");
         }
 
         Ok(match direction {
-            Up => from - BOARD_SIDE as u32,
-            Down => from + BOARD_SIDE as u32,
+            Up => from - BOARD_SIDE,
+            Down => from + BOARD_SIDE,
             Left => from - 1,
             Right => from + 1,
         })
@@ -321,12 +322,12 @@ impl Board {
     /// # Panics
     ///
     /// Panics if the position doesn't contain a valid tile (i.e., it's the empty space)
-    fn get_value(&self, p: u32) -> u32 {
+    fn get_value(self, p: u8) -> u8 {
         let mut target_val = 0;
         let mut target_pos = 0;
 
         // Search through all tiles to find which one is at position 'p'
-        for val in 0..(BOARD_AREA as u32 - 1) {
+        for val in 0..(BOARD_AREA - 1) {
             target_val = val;
             target_pos = self.get_pos(val);
             if target_pos == p {
@@ -334,9 +335,10 @@ impl Board {
             }
         }
 
-        if target_pos != p {
-            panic!("Invalid move: cannot move space in that direction");
-        }
+        assert!(
+            target_pos == p,
+            "Invalid move: cannot move space in that direction"
+        );
 
         target_val // Return tile number (0-7)
     }
@@ -372,15 +374,15 @@ impl Board {
     ///
     /// * `p` - The position to place the tile at (0-8)
     /// * `val` - The tile number (0-7 representing tiles 1-8) to place
-    fn set_value(&mut self, p: u32, val: u32) {
+    fn set_value(&mut self, p: u8, val: u8) {
         // Create 4-bit mask: 0000_1111
         let ones = (1 << TILE_BIT_SIZE) - 1;
         // Position mask at tile's bit field
-        let mask = ones << (TILE_BIT_SIZE as u32 * val);
+        let mask = ones << (TILE_BIT_SIZE * val);
         // Clear old position
         self.0 &= !mask;
         // Set new position
-        self.0 |= p << (TILE_BIT_SIZE as u32 * val);
+        self.0 |= u32::from(p) << (TILE_BIT_SIZE * val);
     }
 
     /// Moves the empty space in the specified direction
@@ -405,33 +407,30 @@ impl Board {
         Ok(self)
     }
 
-    fn get_pos(&self, value: u32) -> u32 {
-        self.0.unbounded_shr(TILE_BIT_SIZE as u32 * value) % (1 << TILE_BIT_SIZE)
+    fn get_pos(self, value: u8) -> u8 {
+        let offset = TILE_BIT_SIZE * value;
+        (self.0.unbounded_shr(u32::from(offset)) % (1 << TILE_BIT_SIZE))
+            .try_into()
+            .expect("TILE_BIT_SIZE should be less than 8")
     }
 
-    pub fn heuristic_distance_to_solution(&self) -> usize {
+    pub fn heuristic_distance_to_solution(self) -> u8 {
         let solution = Self::default();
         let mut distance = 0;
 
-        for val in 0..(BOARD_AREA as u32 - 1) {
-            distance += Self::manhattan_distance(
-                solution.get_pos(val) as isize,
-                self.get_pos(val) as isize,
-            );
+        for val in 0..(BOARD_AREA - 1) {
+            distance += Self::manhattan_distance(solution.get_pos(val), self.get_pos(val));
         }
 
         distance
-            + Self::manhattan_distance(
-                solution.find_space_position() as isize,
-                self.find_space_position() as isize,
-            )
+            + Self::manhattan_distance(solution.find_space_position(), self.find_space_position())
     }
 
-    fn manhattan_distance(pos1: isize, pos2: isize) -> usize {
-        let hdis = (pos2 % BOARD_SIDE as isize) - (pos1 % BOARD_SIDE as isize);
-        let vdis = (pos2 / BOARD_SIDE as isize) - (pos1 / BOARD_SIDE as isize);
+    fn manhattan_distance(pos1: u8, pos2: u8) -> u8 {
+        let hdis = (pos2 % BOARD_SIDE).abs_diff(pos1 % BOARD_SIDE);
+        let vdis = (pos2 / BOARD_SIDE).abs_diff(pos1 / BOARD_SIDE);
 
-        (hdis.abs() + vdis.abs()) as usize
+        hdis + vdis
     }
 }
 
@@ -464,12 +463,12 @@ impl Display for Board {
         let arr = self.into_arr();
 
         for (i, val) in arr.iter().enumerate() {
-            if i % BOARD_SIDE == 0 && i != 0 {
+            if i % BOARD_SIDE as usize == 0 && i != 0 {
                 writeln!(f)?;
             }
 
             if *val != 0 {
-                write!(f, "{:2} ", val)?;
+                write!(f, "{val:2} ")?;
             } else {
                 write!(f, "   ")?;
             }
@@ -479,11 +478,11 @@ impl Display for Board {
     }
 }
 
-#[derive(PartialEq, Eq, Default, Clone)]
 /// Board annotated with the number of steps taken to reach it (g-cost).
 ///
 /// When ordered, it uses `heuristic_distance_to_solution() + steps` which
 /// allows a priority queue to behave like A* with an admissible heuristic.
+#[derive(PartialEq, Eq, Default, Clone)]
 pub struct BoardWithSteps(pub Board, pub usize);
 
 impl PartialOrd for BoardWithSteps {
@@ -494,7 +493,7 @@ impl PartialOrd for BoardWithSteps {
 
 impl Ord for BoardWithSteps {
     fn cmp(&self, other: &Self) -> Ordering {
-        (self.0.heuristic_distance_to_solution() + self.1)
-            .cmp(&(other.0.heuristic_distance_to_solution() + other.1))
+        (self.0.heuristic_distance_to_solution() as usize + self.1)
+            .cmp(&(other.0.heuristic_distance_to_solution() as usize + other.1))
     }
 }

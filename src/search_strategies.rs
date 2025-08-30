@@ -14,7 +14,7 @@
 //! be plugged in easily.
 use std::{
     cmp::Reverse,
-    collections::{BinaryHeap, LinkedList},
+    collections::{BinaryHeap, VecDeque},
 };
 
 use crate::solver::ExplorerStrategy;
@@ -31,14 +31,14 @@ pub trait SearchStrategy<T> {
 
 #[derive(Default, Clone)]
 pub struct SimpleSearchStrategy<T> {
-    nodes: LinkedList<T>,
+    nodes: VecDeque<T>,
     strategy: ExplorerStrategy,
 }
 
 impl<T> SimpleSearchStrategy<T> {
     pub fn new(algorithm: ExplorerStrategy) -> Self {
         Self {
-            nodes: LinkedList::default(),
+            nodes: VecDeque::default(),
             strategy: algorithm,
         }
     }

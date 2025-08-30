@@ -145,9 +145,9 @@ impl From<&[Stats]> for StatsSummary {
 fn fmt_num(n: f64) -> String {
     if n.is_finite() {
         if n.abs() >= 1000.0 {
-            format!("{:.0}", n)
+            format!("{n:.0}")
         } else {
-            format!("{:.2}", n)
+            format!("{n:.2}")
         }
     } else {
         "NaN".to_string()
@@ -240,5 +240,5 @@ pub fn print_comparison_table(left: &StatsSummary, right: &StatsSummary, other: 
         other.avg_max_depth_reached,
     );
 
-    println!("{table}")
+    println!("{table}");
 }
