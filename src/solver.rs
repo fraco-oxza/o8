@@ -5,7 +5,7 @@
 //! strategies, providing detailed statistics about the search process.
 use clap::ValueEnum;
 
-use crate::board::{ALL_DIRECTIONS, Board};
+use crate::board::{ALL_DIRECTIONS, Board, BoardWithSteps};
 use crate::search_strategies::SearchStrategy;
 use crate::stats::Stats;
 use std::collections::{HashMap, HashSet};
@@ -56,7 +56,7 @@ where
 
 impl<T> Solver<T>
 where
-    T: SearchStrategy<Board> + Default + Clone,
+    T: SearchStrategy<BoardWithSteps> + Default + Clone,
 {
     /// Solves the puzzle using the configured search strategy
     ///
@@ -72,11 +72,11 @@ where
         let start = Instant::now();
 
         while let Some(board) = self.boards_to_check.get_next() {
-            self.mark_explored(board);
+            self.mark_explored(board.0);
             self.record_frontier_size();
 
-            if board.is_solved() {
-                return self.finish_with_solution(start, board);
+            if board.0.is_solved() {
+                return self.finish_with_solution(start, board.0);
             }
 
             self.expand_neighbors(board);
@@ -155,7 +155,7 @@ where
     ///
     /// * `start` - The initial board state to begin searching from
     fn init_search(&mut self, start: Board) {
-        self.boards_to_check.enqueue(start);
+        self.boards_to_check.enqueue(BoardWithSteps(start, 0));
         self.depth_by_board.insert(start, 0);
     }
 
@@ -205,14 +205,14 @@ where
     ///
     /// * `parent` - The parent board state
     /// * `child` - The successor board state to enqueue
-    fn enqueue_successor(&mut self, parent: Board, child: Board) {
-        self.boards_to_check.enqueue(child);
+    fn enqueue_successor(&mut self, parent: BoardWithSteps, child: BoardWithSteps) {
+        self.boards_to_check.enqueue(child.clone());
         self.enqueued_nodes += 1;
-        self.parents.insert(child, parent);
+        self.parents.insert(child.0, parent.0);
 
-        let parent_depth = *self.depth_by_board.get(&parent).unwrap_or(&0);
+        let parent_depth = *self.depth_by_board.get(&parent.0).unwrap_or(&0);
         let depth = parent_depth + 1;
-        self.depth_by_board.insert(child, depth);
+        self.depth_by_board.insert(child.0, depth);
         if depth > self.max_depth_reached {
             self.max_depth_reached = depth;
         }
@@ -226,11 +226,11 @@ where
     ///
     /// * `parent` - The parent board state
     /// * `dir` - The direction to move the empty space
-    fn process_move(&mut self, parent: Board, dir: crate::board::Direction) {
-        if let Ok(child) = parent.move_space(dir) {
+    fn process_move(&mut self, parent: BoardWithSteps, dir: crate::board::Direction) {
+        if let Ok(child) = parent.0.move_space(dir) {
             self.generated_nodes += 1;
             if !self.boards_checked.contains(&child) {
-                self.enqueue_successor(parent, child);
+                self.enqueue_successor(parent.clone(), BoardWithSteps(child, parent.1 + 1));
             } else {
                 self.duplicates_pruned += 1;
             }
@@ -245,9 +245,9 @@ where
     /// # Arguments
     ///
     /// * `board` - The current board state to expand
-    fn expand_neighbors(&mut self, board: Board) {
+    fn expand_neighbors(&mut self, board: BoardWithSteps) {
         for direction in &ALL_DIRECTIONS {
-            self.process_move(board, *direction);
+            self.process_move(board.clone(), *direction);
         }
     }
 }

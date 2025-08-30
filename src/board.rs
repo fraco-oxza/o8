@@ -480,3 +480,19 @@ impl Display for Board {
         Ok(())
     }
 }
+
+#[derive(PartialEq, Eq, Default, Clone)]
+pub struct BoardWithSteps(pub Board, pub usize);
+
+impl PartialOrd for BoardWithSteps {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for BoardWithSteps {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (self.0.heuristic_distance_to_solution() + self.1)
+            .cmp(&(other.0.heuristic_distance_to_solution() + other.1))
+    }
+}

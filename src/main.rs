@@ -11,6 +11,7 @@ use clap::Subcommand;
 use clap::ValueEnum;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
+use crate::board::BoardWithSteps;
 use crate::search_strategies::HeuristicSearchStrategy;
 use crate::search_strategies::SearchStrategy;
 use crate::search_strategies::SimpleSearchStrategy;
@@ -81,7 +82,7 @@ enum Commands {
 /// A vector of statistics for each solved board
 fn run_search<T>(boards: &[Board], solver: Solver<T>) -> Vec<Stats>
 where
-    T: SearchStrategy<board::Board> + Default + Send + Sync + Clone,
+    T: SearchStrategy<board::BoardWithSteps> + Default + Send + Sync + Clone,
 {
     boards
         .par_iter()
@@ -122,7 +123,7 @@ fn benchmark(runs: usize, scramble_steps: usize) {
 
 fn solve_one<T>(board: Board, mut solver: Solver<T>)
 where
-    T: SearchStrategy<Board> + Clone + Default,
+    T: SearchStrategy<BoardWithSteps> + Clone + Default,
 {
     solver.solve(board).expect("Not solution founded");
     let solution = solver.step_by_step_solution();
