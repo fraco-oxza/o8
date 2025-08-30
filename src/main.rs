@@ -16,6 +16,7 @@
 //!
 //! See the project README or run with `--help` for full details.
 #![warn(clippy::pedantic)]
+#![allow(clippy::cast_precision_loss)]
 
 use clap::Parser;
 use clap::Subcommand;
@@ -31,7 +32,7 @@ use crate::search_strategies::SimpleSearchStrategy;
 use crate::{
     board::Board,
     solver::{ExplorerStrategy, Solver},
-    stats::{Stats, print_comparison_table},
+    stats::{Stats, print_comparison_table, print_run_stats},
 };
 
 pub(crate) mod board;
@@ -157,25 +158,39 @@ fn solve_one<T>(board: Board, mut solver: Solver<T>)
 where
     T: SearchStrategy<BoardWithSteps> + Clone + Default,
 {
-    solver.solve(board).expect("Not solution founded");
+    solver.solve(board).expect("No solution found");
     let solution = solver.step_by_step_solution();
 
-    for (step, idx) in solution.iter().zip(0..) {
-        println!("{}", "-".repeat(6));
+    println!(
+        "\nSolution path ({} steps)\n",
+        solution.len().saturating_sub(1)
+    );
+    for (idx, step) in solution.iter().enumerate() {
+        println!(
+            "Step {}/{} h(n): {} ",
+            idx,
+            solution.len() - 1,
+            step.heuristic_distance_to_solution()
+        );
         println!("{step}");
-
-        println!("distance to solution");
-        println!("  estimated : {}", step.heuristic_distance_to_solution());
-        println!("  real      : {}", solution.len() - idx - 1);
-        println!("{}", "-".repeat(6));
     }
 
-    println!("{:#?}", solver.get_solution_stats());
+    let stats = solver.get_solution_stats();
+    print_run_stats(&stats);
 }
 
 /// Solve a single random puzzle board and display the solution steps
 fn solve_random(scramble_steps: usize, algo: SolveAlgorithm) {
     let board = Board::random_with_solution(scramble_steps);
+    println!(
+        "Solving a random board ({} scramble moves) using {}...",
+        scramble_steps,
+        match algo {
+            SolveAlgorithm::Dfs => "DFS",
+            SolveAlgorithm::Bfs => "BFS",
+            SolveAlgorithm::Heuristic => "Heuristic",
+        }
+    );
 
     match algo {
         SolveAlgorithm::Dfs => solve_one(

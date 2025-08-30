@@ -242,3 +242,40 @@ pub fn print_comparison_table(left: &StatsSummary, right: &StatsSummary, other: 
 
     println!("{table}");
 }
+
+/// Prints a formatted table for a single run's statistics
+///
+/// Mirrors the labels used in the comparison table so outputs feel consistent
+/// between `benchmark` and `solve-random` commands.
+pub fn print_run_stats(stats: &Stats) {
+    let mut table = Table::new();
+    table.load_preset(presets::UTF8_FULL_CONDENSED);
+    table.apply_modifier(modifiers::UTF8_ROUND_CORNERS);
+    table.set_content_arrangement(ContentArrangement::Dynamic);
+    table.set_header(["Metric", "Value"]);
+
+    let mut row = |metric: &str, v: String| {
+        table.add_row([
+            Cell::new(metric).add_attribute(Attribute::Bold),
+            Cell::new(v).set_alignment(CellAlignment::Right),
+        ]);
+    };
+
+    row("Time (ms)", format!("{}", stats.duration_ms));
+    row("Nodes explored", format!("{}", stats.nodes_explored));
+    row("Nodes generated", format!("{}", stats.generated_nodes));
+    row("Enqueued", format!("{}", stats.enqueued_nodes));
+    row(
+        "Discards (duplicates)",
+        format!("{}", stats.duplicates_pruned),
+    );
+    row(
+        "Solution length (moves)",
+        format!("{}", stats.solution_moves),
+    );
+    row("Peak frontier", format!("{}", stats.max_frontier));
+    row("Average frontier", fmt_num(stats.avg_frontier));
+    row("Max depth", format!("{}", stats.max_depth_reached));
+
+    println!("\nRun statistics\n\n{table}");
+}

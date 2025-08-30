@@ -43,8 +43,9 @@
 //!
 //! This gives us the magic number: `SOLVED_BOARD = 1985229328`
 
-use std::{cmp::Ordering, fmt::Display};
+use std::{cmp::Ordering, fmt::Display, sync::LazyLock};
 
+use colored::Colorize;
 use rand::{rng, seq::IndexedRandom};
 
 use Direction::{Down, Left, Right, Up};
@@ -52,8 +53,15 @@ use Direction::{Down, Left, Right, Up};
 /// Array containing all possible movement directions
 pub const ALL_DIRECTIONS: [Direction; 4] = [Up, Down, Left, Right];
 
+#[rustfmt::skip]
+const SOLVED_BOARD: [u8; BOARD_AREA as usize] = [
+    1, 2, 3,
+    8, 0, 4,
+    7, 6, 5
+];
+
 /// The solved board state represented as a 32-bit integer
-const SOLVED_BOARD: u32 = 1_985_229_328;
+static SOLVED_BOARD_ENCODED: LazyLock<u32> = LazyLock::new(|| Board::from_arr(&SOLVED_BOARD).0);
 
 /// The side length of the square board (3x3 grid)
 const BOARD_SIDE: u8 = 3;
@@ -195,13 +203,37 @@ impl Board {
         arr
     }
 
+    /// Creates a board from a 2D array representation
+    ///
+    /// This function encodes the array format back into the compact 32-bit representation.
+    /// It assumes that the input array is valid (contains numbers 0-8 with no duplicates).
+    ///
+    /// # Arguments
+    ///
+    /// * `arr` - A reference to a 9-element array representing the board state
+    ///
+    /// # Returns
+    ///
+    /// The encoded `Board` instance
+    pub fn from_arr(arr: &[u8; BOARD_AREA as usize]) -> Self {
+        let mut board = Board(0);
+
+        for (pos, &val) in arr.iter().enumerate() {
+            if val != 0 {
+                board.set_value(pos.try_into().expect("Should be less than 256"), val - 1);
+            }
+        }
+
+        board
+    }
+
     /// Checks if the board is in the solved state
     ///
     /// # Returns
     ///
     /// `true` if the board is solved (tiles are in numerical order), `false` otherwise
     pub fn is_solved(self) -> bool {
-        self.0 == SOLVED_BOARD
+        self.0 == *SOLVED_BOARD_ENCODED
     }
 
     /// Validates if a movement is possible from a given position
@@ -423,7 +455,7 @@ impl Board {
         }
 
         distance
-            + Self::manhattan_distance(solution.find_space_position(), self.find_space_position())
+        // + Self::manhattan_distance(solution.find_space_position(), self.find_space_position())
     }
 
     fn manhattan_distance(pos1: u8, pos2: u8) -> u8 {
@@ -450,7 +482,7 @@ impl Ord for Board {
 /// Default implementation creates a solved board state
 impl Default for Board {
     fn default() -> Self {
-        Board(SOLVED_BOARD)
+        Board(*SOLVED_BOARD_ENCODED)
     }
 }
 
@@ -460,15 +492,21 @@ impl Default for Board {
 /// represented by three spaces.
 impl Display for Board {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let arr = self.into_arr();
+        let arr = self.into_arr().into_iter();
+        let target = Board::default().into_arr().into_iter();
 
-        for (i, val) in arr.iter().enumerate() {
+        for (i, (val, is_in_position)) in arr.zip(target).map(|(a, t)| (a, a == t)).enumerate() {
             if i % BOARD_SIDE as usize == 0 && i != 0 {
                 writeln!(f)?;
             }
 
-            if *val != 0 {
-                write!(f, "{val:2} ")?;
+            if val != 0 {
+                let s = format!("{val:2} ");
+                if is_in_position {
+                    write!(f, "{}", s.green().bold())?;
+                } else {
+                    write!(f, "{}", s.red())?;
+                }
             } else {
                 write!(f, "   ")?;
             }
