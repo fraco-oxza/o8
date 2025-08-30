@@ -1,8 +1,10 @@
 //! # Solver Module
 //!
-//! This module implements search algorithms for solving the 8-puzzle.
-//! It supports both Depth-First Search (DFS) and Breadth-First Search (BFS)
-//! strategies, providing detailed statistics about the search process.
+//! This module implements the core solver for the 8-puzzle.
+//! It supports multiple frontier strategies, including Depth-First Search (DFS),
+//! Breadth-First Search (BFS), and a heuristic best-first approach when combined
+//! with a priority queue strategy. The solver produces detailed statistics about
+//! the search process.
 use clap::ValueEnum;
 
 use crate::board::{ALL_DIRECTIONS, Board, BoardWithSteps};

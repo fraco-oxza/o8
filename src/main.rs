@@ -1,16 +1,25 @@
 //! # O8 - 8-Puzzle Solver
 //!
-//! A high-performance 8-puzzle solver that compares the effectiveness of different search strategies
-//! (Depth-First Search vs Breadth-First Search) using parallel processing for performance analysis.
+//! A high-performance 8-puzzle solver that compares multiple search strategies
+//! (Depth-First Search, Breadth-First Search, and a heuristic best-first/A*-style search)
+//! with parallel benchmarking and rich statistics.
 //!
-//! The 8-puzzle is a sliding puzzle consisting of a 3x3 grid with 8 numbered tiles and one empty space.
+//! The 8-puzzle is a sliding puzzle consisting of a 3×3 grid with 8 numbered tiles and one empty space.
 //! The goal is to arrange the tiles in numerical order by sliding them into the empty space.
+//!
+//! ## CLI overview
+//!
+//! This binary exposes two subcommands:
+//!
+//! - `benchmark`: Generate random solvable boards and compare strategies in parallel.
+//! - `solve-random`: Scramble a solved board and print the step-by-step solution with the chosen strategy.
+//!
+//! See the project README or run with `--help` for full details.
 
 use clap::Parser;
 use clap::Subcommand;
 use clap::ValueEnum;
 use indicatif::ParallelProgressIterator;
-use rayon::ThreadBuilder;
 use rayon::ThreadPoolBuilder;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
@@ -35,6 +44,7 @@ const DEFAULT_RUNS: usize = 200;
 /// Default number of scramble steps to generate random boards
 const DEFAULT_SCRAMBLE_STEPS: usize = 200;
 
+/// Available solving algorithms
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 enum SolveAlgorithm {
     /// Depth-First Search: explores as far as possible along each branch before backtracking
@@ -52,9 +62,10 @@ struct Args {
     command: Commands,
 }
 
+/// Subcommands supported by the CLI
 #[derive(Subcommand)]
 enum Commands {
-    /// Runs multiple search and compares the results
+    /// Run many random boards and compare strategies with aggregate stats
     Benchmark {
         /// Number of test runs to perform for each algorithm
         #[arg(short, long, default_value_t = DEFAULT_RUNS)]
@@ -62,11 +73,13 @@ enum Commands {
         /// Number of scramble steps to generate random puzzle boards
         #[arg(short, long, default_value_t = DEFAULT_SCRAMBLE_STEPS)]
         scramble_steps: usize,
+        /// Number of worker threads to use (defaults to Rayon automatic)
         #[arg(short, long)]
         threads: Option<usize>,
     },
-    /// Runs one random board, solved it and show the path
+    /// Solve a single random board and print the path
     SolveRandom {
+        /// Algorithm to use (defaults to heuristic)
         #[arg(short, long, value_enum)]
         algorithm: Option<SolveAlgorithm>,
         /// Number of scramble steps to generate random puzzle boards
@@ -75,12 +88,12 @@ enum Commands {
     },
 }
 
-/// Runs a search algorithm on a collection of boards in parallel
+/// Run a search algorithm on a collection of boards in parallel
 ///
 /// # Arguments
 ///
 /// * `boards` - A slice of puzzle boards to solve
-/// * `algo` - The search strategy to use (DFS or BFS)
+/// * `solver` - A configured `Solver` with the chosen strategy
 ///
 /// # Returns
 ///
@@ -100,10 +113,10 @@ where
         .collect()
 }
 
-/// Benchmarks the performance of DFS vs BFS on random puzzle boards
+/// Benchmark the performance of the available strategies on random boards
 fn benchmark(runs: usize, scramble_steps: usize, threads: Option<usize>) {
     println!(
-        "Generating {runs} random boards with {scramble_steps} moves and comparing DFS vs BFS..."
+    "Generating {runs} random boards with {scramble_steps} moves and comparing strategies..."
     );
 
     if let Some(t) = threads {
@@ -128,7 +141,7 @@ fn benchmark(runs: usize, scramble_steps: usize, threads: Option<usize>) {
         &boards,
         Solver::new(SimpleSearchStrategy::new(ExplorerStrategy::Bfs)),
     );
-    println!("Running Heuristic Search...");
+    println!("Running Heuristic Search (A*-style) ...");
     let etc = run_search(&boards, Solver::new(HeuristicSearchStrategy::default()));
 
     print_comparison_table(
@@ -138,6 +151,7 @@ fn benchmark(runs: usize, scramble_steps: usize, threads: Option<usize>) {
     );
 }
 
+/// Solve a single board and print the path and per-step heuristic
 fn solve_one<T>(board: Board, mut solver: Solver<T>)
 where
     T: SearchStrategy<BoardWithSteps> + Clone + Default,
@@ -158,7 +172,7 @@ where
     println!("{:#?}", solver.get_solution_stats());
 }
 
-/// Solves a single random puzzle board and displays the solution steps
+/// Solve a single random puzzle board and display the solution steps
 fn solve_random(scramble_steps: usize, algo: SolveAlgorithm) {
     let board = Board::random_with_solution(scramble_steps);
 

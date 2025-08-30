@@ -1,13 +1,16 @@
 # O8 - 8-Puzzle Solver
 
-A high-performance 8-puzzle solver written in Rust that compares the effectiveness of different search strategies (Depth-First Search vs Breadth-First Search) using parallel processing for performance analysis.
+A high-performance 8-puzzle solver in Rust that compares multiple search strategies
+in parallel and reports rich statistics. It supports Depth-First Search (DFS),
+Breadth-First Search (BFS), and a heuristic best-first/A*-style strategy.
 
 ## Overview
 
-The 8-puzzle is a classic sliding puzzle consisting of a 3×3 grid with 8 numbered tiles and one empty space. The goal is to arrange the tiles in numerical order by sliding them into the empty space. This solver provides a comprehensive analysis of two fundamental search algorithms:
+The 8-puzzle is a classic sliding puzzle consisting of a 3×3 grid with 8 numbered tiles and one empty space. The goal is to arrange the tiles in numerical order by sliding them into the empty space. This solver provides a comprehensive analysis of three search algorithms:
 
 - **Depth-First Search (DFS)**: Explores as far as possible along each branch before backtracking
 - **Breadth-First Search (BFS)**: Explores all neighbors at the current depth before moving deeper
+- **Heuristic (A*-style)**: Expands states by increasing f(n) = g(n) + h(n), where h(n) is Manhattan distance
 
 ## Features
 
@@ -41,47 +44,69 @@ cargo run --release
 
 ### Basic Usage
 
-Run with default settings (200 runs, 200 scramble steps):
+Run a benchmark with default settings (200 runs, 200 scramble steps):
 
 ```bash
 cargo run --release
 ```
 
-### Custom Configuration
+### Subcommands
+
+This binary provides two subcommands: `benchmark` and `solve-random`.
+
+1) Benchmark strategies in parallel and print comparison table:
 
 ```bash
 # Run 50 tests with 100 scramble moves each
-cargo run --release -- --runs 50 --scramble-steps 100
+cargo run --release -- benchmark --runs 50 --scramble-steps 100
 
 # Quick test with minimal complexity
-cargo run --release -- --runs 10 --scramble-steps 10
+cargo run --release -- benchmark --runs 10 --scramble-steps 10
+
+Optional: Fix the number of threads used by Rayon:
+
+```bash
+cargo run --release -- benchmark --runs 200 --scramble-steps 200 --threads 8
+```
+
+2) Solve a single random board and print the path using a selected algorithm:
+
+```bash
+# Heuristic (default)
+cargo run --release -- solve-random --scramble-steps 40
+
+# Force DFS or BFS
+cargo run --release -- solve-random --algorithm dfs --scramble-steps 40
+cargo run --release -- solve-random --algorithm bfs --scramble-steps 40
+```
 ```
 
 ### Command Line Options
 
-- `-r, --runs <RUNS>`: Number of test runs to perform for each algorithm (default: 200)
-- `-s, --scramble-steps <STEPS>`: Number of scramble steps to generate random puzzle boards (default: 200)
+- `-r, --runs <RUNS>`: Number of test runs to perform for each algorithm (default: 200) [benchmark]
+- `-s, --scramble-steps <STEPS>`: Number of scramble steps to generate random puzzle boards (default: 200) [benchmark, solve-random]
+- `-t, --threads <N>`: Number of worker threads to use (defaults to Rayon automatic) [benchmark]
+- `-a, --algorithm <dfs|bfs|heuristic>`: Algorithm for solve-random (default: heuristic)
 - `-h, --help`: Display help information
 
 ## Example Output
 
 ```
-Generating 200 random boards with 200 moves and comparing DFS vs BFS...
+Generating 200 random boards with 200 moves and comparing strategies...
 
-Strategy Comparison (runs: 200, Dfs vs Bfs)
+Strategy Comparison (runs: 200, Dfs vs Bfs vs Heuristic)
 
-Metric                   DFS (avg)        BFS (avg)       
------------------------- ---------------- ----------------
-Time per run (ms)        45.23            12.67           
-Nodes explored           15234.50         892.34          
-Nodes generated          42156.78         2134.89         
-Enqueued                 26922.28         1242.55         
-Discards (duplicates)    15234.50         892.34          
-Solution length (moves)  187.45           23.12           
-Peak frontier            12453.67         456.78          
-Average frontier         6226.84          228.39          
-Max depth                187.45           23.67           
-Throughput (nodes/ms)    336.78           70.45           
+Metric                   DFS (avg)        BFS (avg)        Heuristic (avg)
+------------------------ ---------------- ---------------- ----------------
+Time per run (ms)        45.23            12.67            8.41
+Nodes explored           15234.50         892.34           650.10
+Nodes generated          42156.78         2134.89          1620.33
+Enqueued                 26922.28         1242.55          970.23
+Discards (duplicates)    15234.50         892.34           650.10
+Solution length (moves)  187.45           23.12            23.12
+Peak frontier            12453.67         456.78           310.21
+Average frontier         6226.84          228.39           156.59
+Max depth                187.45           23.67            23.67
 ```
 
 ## Architecture
@@ -174,7 +199,7 @@ The solver leverages Rayon for parallel execution:
 
 ### Search Implementation
 
-Both algorithms share a common framework:
+All strategies share a common framework:
 1. Initialize with starting board state
 2. Maintain frontier of unexplored states
 3. Track parent relationships for solution reconstruction
@@ -185,6 +210,8 @@ Both algorithms share a common framework:
 - [`clap`](https://crates.io/crates/clap) - Command-line argument parsing
 - [`rand`](https://crates.io/crates/rand) - Random board generation
 - [`rayon`](https://crates.io/crates/rayon) - Parallel processing
+- [`comfy-table`](https://crates.io/crates/comfy-table) - Nicely formatted comparison table
+- [`indicatif`](https://crates.io/crates/indicatif) - Parallel progress reporting
 
 ## Documentation
 
@@ -193,6 +220,10 @@ Generate and view the full API documentation:
 ```bash
 cargo doc --open
 ```
+
+## Disclaimer
+
+Documentation in this repository (README and rustdoc comments) was created with AI support under the author's guidance. The author provided the intent and direction in most cases. The core algorithms, design, and implementation of the solver were written by hand.
 
 ## Performance Tips
 

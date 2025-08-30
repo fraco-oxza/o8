@@ -1,3 +1,17 @@
+//! Search strategy abstractions and implementations.
+//!
+//! This module defines a small strategy trait and a couple of concrete queue
+//! types to drive the solver:
+//!
+//! - `SimpleSearchStrategy` implements FIFO (BFS) or LIFO (DFS) behavior using
+//!   a `LinkedList`, depending on the configured `ExplorerStrategy`.
+//! - `HeuristicSearchStrategy` implements a best-first priority queue using a
+//!   `BinaryHeap`, suitable for A*-like expansions when paired with a type that
+//!   implements `Ord` based on f(n) = g(n)+h(n). In this project we use
+//!   `Reverse<BoardWithSteps>` so that lower cost pops first.
+//!
+//! The solver is generic over `SearchStrategy<T>`, so new frontier policies can
+//! be plugged in easily.
 use std::{
     cmp::Reverse,
     collections::{BinaryHeap, LinkedList},
@@ -5,9 +19,13 @@ use std::{
 
 use crate::solver::ExplorerStrategy;
 
+/// Minimal frontier abstraction used by the solver.
 pub trait SearchStrategy<T> {
+    /// Pop the next node to expand according to the policy.
     fn get_next(&mut self) -> Option<T>;
+    /// Push a node into the frontier.
     fn enqueue(&mut self, node: T);
+    /// Current frontier size.
     fn len(&self) -> usize;
 }
 
@@ -43,6 +61,7 @@ impl<T> SearchStrategy<T> for SimpleSearchStrategy<T> {
     }
 }
 
+/// A best-first priority queue based on `Ord`.
 #[derive(Default, Clone)]
 pub struct HeuristicSearchStrategy<T: Ord + PartialOrd>(BinaryHeap<T>);
 

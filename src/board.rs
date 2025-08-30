@@ -480,6 +480,10 @@ impl Display for Board {
 }
 
 #[derive(PartialEq, Eq, Default, Clone)]
+/// Board annotated with the number of steps taken to reach it (g-cost).
+///
+/// When ordered, it uses `heuristic_distance_to_solution() + steps` which
+/// allows a priority queue to behave like A* with an admissible heuristic.
 pub struct BoardWithSteps(pub Board, pub usize);
 
 impl PartialOrd for BoardWithSteps {

@@ -2,8 +2,8 @@
 //!
 //! This module provides comprehensive statistics collection and reporting
 //! for the 8-puzzle solver performance analysis. It tracks various metrics
-//! during the search process and provides formatted output for comparison
-//! between different search strategies.
+//! during the search process and offers formatted output to compare
+//! different search strategies side-by-side.
 
 use std::fmt::{self, Display};
 
@@ -164,14 +164,17 @@ fn fmt_num(n: f64) -> String {
 /// * `left` - Statistics summary for the first strategy
 /// * `right` - Statistics summary for the second strategy
 pub fn print_comparison_table(left: &StatsSummary, right: &StatsSummary, other: &StatsSummary) {
-    let title = format!("Strategy Comparison (runs: {})", left.runs);
+    let title = format!(
+        "Strategy Comparison (runs: {}, Dfs vs Bfs vs Heuristic)",
+        left.runs
+    );
     println!("\n{title}\n");
 
     let mut table = Table::new();
     table.load_preset(presets::UTF8_FULL_CONDENSED);
     table.apply_modifier(modifiers::UTF8_ROUND_CORNERS);
     table.set_content_arrangement(ContentArrangement::Dynamic);
-    table.set_header(["Metric", "DFS (avg)", "BFS (avg)", "HTC (avg)"]);
+    table.set_header(["Metric", "DFS (avg)", "BFS (avg)", "Heuristic (avg)"]);
 
     let mut row = |metric: &str, l: f64, r: f64, o: f64| {
         table.add_row([
