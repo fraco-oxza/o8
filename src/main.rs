@@ -22,6 +22,7 @@ use clap::Parser;
 use clap::Subcommand;
 use clap::ValueEnum;
 use indicatif::ParallelProgressIterator;
+use indicatif::ProgressIterator;
 use rayon::ThreadPoolBuilder;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
@@ -117,10 +118,6 @@ where
 
 /// Benchmark the performance of the available strategies on random boards
 fn benchmark(runs: usize, scramble_steps: usize, threads: Option<usize>) {
-    println!(
-        "Generating {runs} random boards with {scramble_steps} moves and comparing strategies..."
-    );
-
     if let Some(t) = threads {
         ThreadPoolBuilder::new()
             .num_threads(t)
@@ -129,7 +126,12 @@ fn benchmark(runs: usize, scramble_steps: usize, threads: Option<usize>) {
         println!("Using {t} threads for parallel execution.");
     }
 
+    println!(
+        "Generating {runs} random boards with {scramble_steps} moves and comparing strategies..."
+    );
+
     let boards: Vec<Board> = (0..runs)
+        .progress()
         .map(|_| Board::random_with_solution(scramble_steps))
         .collect();
 
