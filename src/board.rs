@@ -446,6 +446,33 @@ impl Board {
             .expect("TILE_BIT_SIZE should be less than 8")
     }
 
+    /// Estimates the heuristic distance to the solution using Manhattan distance
+    ///
+    /// This function calculates the sum of the Manhattan distances for each tile
+    /// from its current position to its target position in the solved state.
+    /// The empty space is not included in this calculation.
+    ///
+    /// ## Algorithm
+    ///
+    /// 1. For each tile (1-8):
+    ///    - Get its current position
+    ///    - Get its target position from the solved state
+    ///    - Calculate the Manhattan distance between these two positions
+    /// 2. Sum all individual distances to get the total heuristic distance
+    ///
+    /// ## Example
+    ///
+    /// If tile 1 is at position 0 (correct) and tile 2 is at position 3 (should be at 1):
+    /// ```text
+    /// Tile 1: distance = 0 (already correct)
+    /// Tile 2: distance = |3%3 - 1%3| + |3/3 - 1/3| = 2
+    /// Total heuristic distance = 0 + 2 + ...
+    /// ```
+    ///
+    /// # Returns
+    ///
+    /// The total Manhattan distance as a `u8` value, representing how far
+    /// the board is from the solved state.
     pub fn heuristic_distance_to_solution(self) -> u8 {
         let solution = Self::default();
         let mut distance = 0;
@@ -455,7 +482,6 @@ impl Board {
         }
 
         distance
-        // + Self::manhattan_distance(solution.find_space_position(), self.find_space_position())
     }
 
     fn manhattan_distance(pos1: u8, pos2: u8) -> u8 {

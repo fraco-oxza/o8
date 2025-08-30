@@ -29,6 +29,7 @@ pub trait SearchStrategy<T> {
     fn len(&self) -> usize;
 }
 
+/// A simple FIFO or LIFO queue based on `VecDeque`.
 #[derive(Default, Clone)]
 pub struct SimpleSearchStrategy<T> {
     nodes: VecDeque<T>,
@@ -36,6 +37,7 @@ pub struct SimpleSearchStrategy<T> {
 }
 
 impl<T> SimpleSearchStrategy<T> {
+    /// Create a new simple search strategy with the given algorithm.
     pub fn new(algorithm: ExplorerStrategy) -> Self {
         Self {
             nodes: VecDeque::default(),
