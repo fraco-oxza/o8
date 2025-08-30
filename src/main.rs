@@ -16,7 +16,6 @@
 //!
 //! See the project README or run with `--help` for full details.
 #![warn(clippy::pedantic)]
-#![allow(clippy::cast_precision_loss)]
 
 use clap::Parser;
 use clap::Subcommand;

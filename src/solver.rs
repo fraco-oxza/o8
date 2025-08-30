@@ -110,9 +110,6 @@ where
     ///
     /// A `Stats` struct containing detailed metrics about the search performance
     pub fn get_solution_stats(&self) -> Stats {
-        let size = self.to_check_size.len().max(1) as f64;
-        let sum: usize = self.to_check_size.iter().copied().sum();
-        let avg_frontier = sum as f64 / size;
         let max_frontier = self.to_check_size.iter().copied().max().unwrap_or(0);
 
         let solution_moves = self.step_by_step_solution().len().saturating_sub(1);
@@ -121,7 +118,6 @@ where
             nodes_explored: self.boards_checked.len(),
             solution_moves,
             max_frontier,
-            avg_frontier,
             generated_nodes: self.generated_nodes,
             enqueued_nodes: self.enqueued_nodes,
             duplicates_pruned: self.duplicates_pruned,

@@ -16,7 +16,7 @@ The 8-puzzle is a classic sliding puzzle consisting of a 3×3 grid with 8 number
 
 - 🚀 **High Performance**: Efficient board representation using compact 32-bit encoding
 - 🔄 **Parallel Processing**: Uses Rayon for concurrent puzzle solving
-- 📊 **Comprehensive Statistics**: Detailed performance metrics and comparison tables
+- 📊 **Comprehensive Statistics**: Detailed performance metrics and comparison tables (mediana y rango intercuartil)
 - 🛠️ **Configurable**: Customizable number of runs and scramble complexity
 - 📝 **Well Documented**: Extensive rustdoc documentation throughout
 
@@ -96,17 +96,17 @@ Generating 200 random boards with 200 moves and comparing strategies...
 
 Strategy Comparison (runs: 200, Dfs vs Bfs vs Heuristic)
 
-Metric                   DFS (avg)        BFS (avg)        Heuristic (avg)
+Metric                   DFS (med [Q1–Q3])   BFS (med [Q1–Q3])   Heuristic (med [Q1–Q3])
 ------------------------ ---------------- ---------------- ----------------
-Time per run (ms)        45.23            12.67            8.41
-Nodes explored           15234.50         892.34           650.10
-Nodes generated          42156.78         2134.89          1620.33
-Enqueued                 26922.28         1242.55          970.23
-Discards (duplicates)    15234.50         892.34           650.10
-Solution length (moves)  187.45           23.12            23.12
-Peak frontier            12453.67         456.78           310.21
-Average frontier         6226.84          228.39           156.59
-Max depth                187.45           23.67            23.67
+Time per run (ms)        45.00 [40.0–52.0]  12.5 [11.8–13.4]     8.4 [7.9–8.9]
+Nodes explored           15235 [14000–16700]  892 [820–960]      650 [600–700]
+Nodes generated          42157 […]           2135 […]            1620 […]
+Enqueued                 26922 […]           1243 […]             970 […]
+Discards (duplicates)    15235 […]            892 […]             650 […]
+Solution length (moves)  187 […]              23 […]              23 […]
+Peak frontier            12454 […]            457 […]             310 […]
+Average frontier         6227 […]             228 […]             157 […]
+Max depth                187 […]               24 […]              24 […]
 ```
 
 ## Architecture

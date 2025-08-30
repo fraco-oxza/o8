@@ -21,8 +21,6 @@ pub struct Stats {
     pub solution_moves: usize,
     /// Maximum size of the frontier during search
     pub max_frontier: usize,
-    /// Average size of the frontier throughout the search
-    pub avg_frontier: f64,
     /// Total number of successor states generated
     pub generated_nodes: usize,
     /// Total number of states added to the frontier
@@ -39,11 +37,10 @@ impl Display for Stats {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "explored={}, moves={}, max_frontier={}, avg_frontier={:.2}, gen={}, enq={}, pruned={}, max_depth={}, time={:.3}ms",
+            "explored={}, moves={}, max_frontier={}, gen={}, enq={}, pruned={}, max_depth={}, time={}ms",
             self.nodes_explored,
             self.solution_moves,
             self.max_frontier,
-            self.avg_frontier,
             self.generated_nodes,
             self.enqueued_nodes,
             self.duplicates_pruned,
@@ -61,96 +58,87 @@ impl Display for Stats {
 pub struct StatsSummary {
     /// Number of puzzle instances included in this summary
     pub runs: usize,
-    /// Average number of board states explored per run
-    pub avg_nodes_explored: f64,
-    /// Average number of moves in solutions found
-    pub avg_solution_moves: f64,
-    /// Average maximum frontier size per run
-    pub avg_max_frontier: f64,
-    /// Average frontier size throughout all runs
-    pub avg_frontier: f64,
-    /// Average number of successor states generated per run
-    pub avg_generated_nodes: f64,
-    /// Average number of states enqueued per run
-    pub avg_enqueued_nodes: f64,
-    /// Average number of duplicate states pruned per run
-    pub avg_duplicates_pruned: f64,
-    /// Average maximum depth reached per run
-    pub avg_max_depth_reached: f64,
-    /// Average solve time per run in milliseconds
-    pub avg_duration_ms: f64,
+    /// Number of board states explored per run (mean ± std)
+    pub nodes_explored: Metric,
+    /// Number of moves in solutions found (mean ± std)
+    pub solution_moves: Metric,
+    /// Maximum frontier size per run (mean ± std)
+    pub max_frontier: Metric,
+    /// Successor states generated per run (mean ± std)
+    pub generated_nodes: Metric,
+    /// States enqueued per run (mean ± std)
+    pub enqueued_nodes: Metric,
+    /// Duplicate states pruned per run (mean ± std)
+    pub duplicates_pruned: Metric,
+    /// Maximum depth reached per run (mean ± std)
+    pub max_depth_reached: Metric,
+    /// Solve time per run in milliseconds (mean ± std)
+    pub duration_ms: Metric,
+}
+
+/// A numeric metric summarized by common percentiles
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Metric {
+    pub p50: u64,
+    pub p75: u64,
+    pub p90: u64,
+    pub p95: u64,
+    pub p99: u64,
+}
+
+impl Metric {
+    #[inline]
+    fn new(p50: u64, p75: u64, p90: u64, p95: u64, p99: u64) -> Self {
+        Self {
+            p50,
+            p75,
+            p90,
+            p95,
+            p99,
+        }
+    }
 }
 
 /// Converts a slice of individual stats into an aggregated summary
 impl From<&[Stats]> for StatsSummary {
     fn from(value: &[Stats]) -> Self {
-        let n = value.len().max(1) as f64;
-        let sum = |mut acc: f64, v: f64| {
-            acc += v;
-            acc
-        };
+        // Helper to compute integer percentiles (nearest-rank) for any projection
+        fn summarize<T, F>(items: &[T], f: F) -> Metric
+        where
+            F: Fn(&T) -> u64,
+        {
+            let n = items.len();
+            if n == 0 {
+                return Metric::default();
+            }
 
-        let avg_nodes_explored = value
-            .iter()
-            .fold(0.0, |a, s| sum(a, s.nodes_explored as f64))
-            / n;
-        let avg_solution_moves = value
-            .iter()
-            .fold(0.0, |a, s| sum(a, s.solution_moves as f64))
-            / n;
-        let avg_max_frontier = value.iter().fold(0.0, |a, s| sum(a, s.max_frontier as f64)) / n;
-        let avg_frontier = value.iter().fold(0.0, |a, s| sum(a, s.avg_frontier)) / n;
-        let avg_generated_nodes = value
-            .iter()
-            .fold(0.0, |a, s| sum(a, s.generated_nodes as f64))
-            / n;
-        let avg_enqueued_nodes = value
-            .iter()
-            .fold(0.0, |a, s| sum(a, s.enqueued_nodes as f64))
-            / n;
-        let avg_duplicates_pruned = value
-            .iter()
-            .fold(0.0, |a, s| sum(a, s.duplicates_pruned as f64))
-            / n;
-        let avg_max_depth_reached = value
-            .iter()
-            .fold(0.0, |a, s| sum(a, s.max_depth_reached as f64))
-            / n;
-        let avg_duration_ms = value.iter().fold(0.0, |a, s| sum(a, s.duration_ms as f64)) / n;
+            let mut vals: Vec<u64> = items.iter().map(f).collect();
+            vals.sort_unstable();
+            let idx = |p: u32| -> usize {
+                // nearest-rank: ceil(p/100 * n), 1-based -> to 0-based index
+                let rank = (p as usize * n).div_ceil(100);
+                rank.saturating_sub(1).min(n - 1)
+            };
+            let p50 = vals[idx(50)];
+            let p75 = vals[idx(75)];
+            let p90 = vals[idx(90)];
+            let p95 = vals[idx(95)];
+            let p99 = vals[idx(99)];
+
+            Metric::new(p50, p75, p90, p95, p99)
+        }
 
         Self {
             runs: value.len(),
-            avg_nodes_explored,
-            avg_solution_moves,
-            avg_max_frontier,
-            avg_frontier,
-            avg_generated_nodes,
-            avg_enqueued_nodes,
-            avg_duplicates_pruned,
-            avg_max_depth_reached,
-            avg_duration_ms,
+            nodes_explored: summarize(value, |s| s.nodes_explored as u64),
+            solution_moves: summarize(value, |s| s.solution_moves as u64),
+            max_frontier: summarize(value, |s| s.max_frontier as u64),
+            generated_nodes: summarize(value, |s| s.generated_nodes as u64),
+            enqueued_nodes: summarize(value, |s| s.enqueued_nodes as u64),
+            duplicates_pruned: summarize(value, |s| s.duplicates_pruned as u64),
+            max_depth_reached: summarize(value, |s| s.max_depth_reached as u64),
+            duration_ms: summarize(value, |s| u64::try_from(s.duration_ms).unwrap_or(u64::MAX)),
         }
-    }
-}
-
-/// Formats a numeric value for display in the comparison table
-///
-/// # Arguments
-///
-/// * `n` - The numeric value to format
-///
-/// # Returns
-///
-/// A formatted string with appropriate precision
-fn fmt_num(n: f64) -> String {
-    if n.is_finite() {
-        if n.abs() >= 1000.0 {
-            format!("{n:.0}")
-        } else {
-            format!("{n:.2}")
-        }
-    } else {
-        "NaN".to_string()
     }
 }
 
@@ -170,77 +158,104 @@ pub fn print_comparison_table(left: &StatsSummary, right: &StatsSummary, other: 
     );
     println!("\n{title}\n");
 
-    let mut table = Table::new();
-    table.load_preset(presets::UTF8_FULL_CONDENSED);
-    table.apply_modifier(modifiers::UTF8_ROUND_CORNERS);
-    table.set_content_arrangement(ContentArrangement::Dynamic);
-    table.set_header(["Metric", "DFS (avg)", "BFS (avg)", "Heuristic (avg)"]);
-
-    let mut row = |metric: &str, l: f64, r: f64, o: f64| {
-        table.add_row([
-            Cell::new(metric).add_attribute(Attribute::Bold),
-            Cell::new(fmt_num(l)).set_alignment(CellAlignment::Right),
-            Cell::new(fmt_num(r)).set_alignment(CellAlignment::Right),
-            Cell::new(fmt_num(o)).set_alignment(CellAlignment::Right),
+    // Helper to print a single-metric table
+    let print_metric_table = |metric_name: &str, l: &Metric, r: &Metric, o: &Metric| {
+        let mut t = Table::new();
+        t.load_preset(presets::UTF8_FULL_CONDENSED);
+        t.apply_modifier(modifiers::UTF8_ROUND_CORNERS);
+        t.set_content_arrangement(ContentArrangement::Dynamic);
+        t.set_header([
+            Cell::new(metric_name).add_attribute(Attribute::Bold),
+            Cell::new("P50"),
+            Cell::new("P75"),
+            Cell::new("P90"),
+            Cell::new("P95"),
+            Cell::new("P99"),
         ]);
+
+        // DFS row
+        t.add_row([
+            Cell::new("DFS").add_attribute(Attribute::Bold),
+            Cell::new(l.p50).set_alignment(CellAlignment::Right),
+            Cell::new(l.p75).set_alignment(CellAlignment::Right),
+            Cell::new(l.p90).set_alignment(CellAlignment::Right),
+            Cell::new(l.p95).set_alignment(CellAlignment::Right),
+            Cell::new(l.p99).set_alignment(CellAlignment::Right),
+        ]);
+        // BFS row
+        t.add_row([
+            Cell::new("BFS").add_attribute(Attribute::Bold),
+            Cell::new(r.p50).set_alignment(CellAlignment::Right),
+            Cell::new(r.p75).set_alignment(CellAlignment::Right),
+            Cell::new(r.p90).set_alignment(CellAlignment::Right),
+            Cell::new(r.p95).set_alignment(CellAlignment::Right),
+            Cell::new(r.p99).set_alignment(CellAlignment::Right),
+        ]);
+        // Heuristic row
+        t.add_row([
+            Cell::new("Heuristic").add_attribute(Attribute::Bold),
+            Cell::new(o.p50).set_alignment(CellAlignment::Right),
+            Cell::new(o.p75).set_alignment(CellAlignment::Right),
+            Cell::new(o.p90).set_alignment(CellAlignment::Right),
+            Cell::new(o.p95).set_alignment(CellAlignment::Right),
+            Cell::new(o.p99).set_alignment(CellAlignment::Right),
+        ]);
+
+        println!("{t}\n");
     };
 
-    row(
+    print_metric_table(
         "Time per run (ms)",
-        left.avg_duration_ms,
-        right.avg_duration_ms,
-        other.avg_duration_ms,
+        &left.duration_ms,
+        &right.duration_ms,
+        &other.duration_ms,
     );
-    row(
+    print_metric_table(
         "Nodes explored",
-        left.avg_nodes_explored,
-        right.avg_nodes_explored,
-        other.avg_nodes_explored,
+        &left.nodes_explored,
+        &right.nodes_explored,
+        &other.nodes_explored,
     );
-    row(
+    print_metric_table(
         "Nodes generated",
-        left.avg_generated_nodes,
-        right.avg_generated_nodes,
-        other.avg_generated_nodes,
+        &left.generated_nodes,
+        &right.generated_nodes,
+        &other.generated_nodes,
     );
-    row(
+    print_metric_table(
         "Enqueued",
-        left.avg_enqueued_nodes,
-        right.avg_enqueued_nodes,
-        other.avg_enqueued_nodes,
+        &left.enqueued_nodes,
+        &right.enqueued_nodes,
+        &other.enqueued_nodes,
     );
-    row(
+    print_metric_table(
         "Discards (duplicates)",
-        left.avg_duplicates_pruned,
-        right.avg_duplicates_pruned,
-        other.avg_duplicates_pruned,
+        &left.duplicates_pruned,
+        &right.duplicates_pruned,
+        &other.duplicates_pruned,
     );
-    row(
+    print_metric_table(
         "Solution length (moves)",
-        left.avg_solution_moves,
-        right.avg_solution_moves,
-        other.avg_solution_moves,
+        &left.solution_moves,
+        &right.solution_moves,
+        &other.solution_moves,
     );
-    row(
+    print_metric_table(
         "Peak frontier",
-        left.avg_max_frontier,
-        right.avg_max_frontier,
-        other.avg_max_frontier,
+        &left.max_frontier,
+        &right.max_frontier,
+        &other.max_frontier,
     );
-    row(
-        "Average frontier",
-        left.avg_frontier,
-        right.avg_frontier,
-        other.avg_frontier,
-    );
-    row(
+    // Average frontier removed
+    print_metric_table(
         "Max depth",
-        left.avg_max_depth_reached,
-        right.avg_max_depth_reached,
-        other.avg_max_depth_reached,
+        &left.max_depth_reached,
+        &right.max_depth_reached,
+        &other.max_depth_reached,
     );
 
-    println!("{table}");
+    println!("Legend:");
+    println!("- Columns are percentiles: P50 (median), P75, P90, P95, P99.");
 }
 
 /// Prints a formatted table for a single run's statistics
@@ -274,7 +289,7 @@ pub fn print_run_stats(stats: &Stats) {
         format!("{}", stats.solution_moves),
     );
     row("Peak frontier", format!("{}", stats.max_frontier));
-    row("Average frontier", fmt_num(stats.avg_frontier));
+    // Average frontier removed
     row("Max depth", format!("{}", stats.max_depth_reached));
 
     println!("\nRun statistics\n\n{table}");
