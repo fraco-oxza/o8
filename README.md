@@ -10,7 +10,7 @@ The 8-puzzle is a classic sliding puzzle consisting of a 3×3 grid with 8 number
 
 - **Depth-First Search (DFS)**: Explores as far as possible along each branch before backtracking
 - **Breadth-First Search (BFS)**: Explores all neighbors at the current depth before moving deeper
-- **Heuristic (A*-style)**: Expands states by increasing f(n) = g(n) + h(n), where h(n) is Manhattan distance
+- **Heuristic (A\*-style)**: Expands states by increasing f(n) = g(n) + h(n), where h(n) is Manhattan distance
 
 ## Features
 
