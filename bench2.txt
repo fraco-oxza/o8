@@ -1,16 +1,2 @@
 Generating 5000 random boards with 10000 moves and comparing DFS vs BFS...
-
-Strategy Comparison (runs: 5000)
-
-Metric                   DFS (avg)        BFS (avg)        HTC (avg)       
------------------------- ---------------- ---------------- ----------------
-Time per run (ms)        61.98            216.81           2.10            
-Nodes explored           65420            92939            1814            
-Nodes generated          182823           501012           5028            
-Enqueued                 107033           230335           2990            
-Discards (duplicates)    75791            270678           2038            
-Solution length (moves)  61012            21.95            22.06           
-Peak frontier            41623            50392            1118            
-Average frontier         22216            31439            567.81          
-Max depth                61048            22.95            22.14           
-Throughput (nodes/ms)    1055             428.67           862.43          
+Running DFS...

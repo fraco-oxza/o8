@@ -7,11 +7,7 @@
 
 use std::fmt::{self, Display};
 
-/// Width for metric column in comparison table
-const METRIC_WIDTH: usize = 24;
-
-/// Width for algorithm columns in comparison table
-const ALGO_WIDTH: usize = 16;
+use comfy_table::{Attribute, Cell, CellAlignment, ContentArrangement, Table, modifiers, presets};
 
 /// Individual statistics for a single puzzle solve
 ///
@@ -83,8 +79,6 @@ pub struct StatsSummary {
     pub avg_max_depth_reached: f64,
     /// Average solve time per run in milliseconds
     pub avg_duration_ms: f64,
-    /// Throughput metric: nodes explored per millisecond
-    pub throughput_nodes_per_ms: f64,
 }
 
 /// Converts a slice of individual stats into an aggregated summary
@@ -123,11 +117,6 @@ impl From<&[Stats]> for StatsSummary {
             .fold(0.0, |a, s| sum(a, s.max_depth_reached as f64))
             / n;
         let avg_duration_ms = value.iter().fold(0.0, |a, s| sum(a, s.duration_ms as f64)) / n;
-        let throughput_nodes_per_ms = if avg_duration_ms > 0.0 {
-            avg_nodes_explored / avg_duration_ms
-        } else {
-            0.0
-        };
 
         Self {
             runs: value.len(),
@@ -140,31 +129,7 @@ impl From<&[Stats]> for StatsSummary {
             avg_duplicates_pruned,
             avg_max_depth_reached,
             avg_duration_ms,
-            throughput_nodes_per_ms,
         }
-    }
-}
-
-/// Formats a cell in the comparison table with proper padding
-///
-/// # Arguments
-///
-/// * `width` - The desired width of the cell
-/// * `val` - The value to display in the cell
-///
-/// # Returns
-///
-/// A string padded to the specified width
-fn fmt_cell(width: usize, val: impl Into<String>) -> String {
-    let s = val.into();
-    if s.len() >= width {
-        s
-    } else {
-        let pad = width - s.len();
-        let mut out = String::with_capacity(width);
-        out.push_str(&s);
-        out.extend(std::iter::repeat_n(" ", pad));
-        out
     }
 }
 
@@ -202,34 +167,19 @@ pub fn print_comparison_table(left: &StatsSummary, right: &StatsSummary, other: 
     let title = format!("Strategy Comparison (runs: {})", left.runs);
     println!("\n{title}\n");
 
-    let headers = [
-        ("Metric", METRIC_WIDTH),
-        ("DFS (avg)", ALGO_WIDTH),
-        ("BFS (avg)", ALGO_WIDTH),
-        ("HTC (avg)", ALGO_WIDTH),
-    ];
+    let mut table = Table::new();
+    table.load_preset(presets::UTF8_FULL_CONDENSED);
+    table.apply_modifier(modifiers::UTF8_ROUND_CORNERS);
+    table.set_content_arrangement(ContentArrangement::Dynamic);
+    table.set_header(["Metric", "DFS (avg)", "BFS (avg)", "HTC (avg)"]);
 
-    let sep: String = headers
-        .iter()
-        .map(|(h, w)| "-".repeat((*w).max(h.len())))
-        .collect::<Vec<_>>()
-        .join(" ");
-
-    let header_line = headers
-        .iter()
-        .map(|(h, w)| fmt_cell(*w, (*h).to_string()))
-        .collect::<Vec<_>>()
-        .join(" ");
-    println!("{}\n{}", header_line, sep);
-
-    let row = |metric: &str, l: f64, r: f64, o: f64| {
-        println!(
-            "{} {} {} {}",
-            fmt_cell(METRIC_WIDTH, metric),
-            fmt_cell(ALGO_WIDTH, fmt_num(l)),
-            fmt_cell(ALGO_WIDTH, fmt_num(r)),
-            fmt_cell(ALGO_WIDTH, fmt_num(o))
-        );
+    let mut row = |metric: &str, l: f64, r: f64, o: f64| {
+        table.add_row([
+            Cell::new(metric).add_attribute(Attribute::Bold),
+            Cell::new(fmt_num(l)).set_alignment(CellAlignment::Right),
+            Cell::new(fmt_num(r)).set_alignment(CellAlignment::Right),
+            Cell::new(fmt_num(o)).set_alignment(CellAlignment::Right),
+        ]);
     };
 
     row(
@@ -286,10 +236,6 @@ pub fn print_comparison_table(left: &StatsSummary, right: &StatsSummary, other: 
         right.avg_max_depth_reached,
         other.avg_max_depth_reached,
     );
-    row(
-        "Throughput (nodes/ms)",
-        left.throughput_nodes_per_ms,
-        right.throughput_nodes_per_ms,
-        other.throughput_nodes_per_ms,
-    );
+
+    println!("{table}")
 }

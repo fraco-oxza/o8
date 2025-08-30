@@ -420,12 +420,11 @@ impl Board {
             );
         }
 
-        distance += Self::manhattan_distance(
-            solution.find_space_position() as isize,
-            self.find_space_position() as isize,
-        );
-
         distance
+            + Self::manhattan_distance(
+                solution.find_space_position() as isize,
+                self.find_space_position() as isize,
+            )
     }
 
     fn manhattan_distance(pos1: isize, pos2: isize) -> usize {
@@ -462,7 +461,6 @@ impl Default for Board {
 /// represented by three spaces.
 impl Display for Board {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{}", self.heuristic_distance_to_solution())?;
         let arr = self.into_arr();
 
         for (i, val) in arr.iter().enumerate() {

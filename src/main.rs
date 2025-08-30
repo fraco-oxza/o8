@@ -9,6 +9,9 @@
 use clap::Parser;
 use clap::Subcommand;
 use clap::ValueEnum;
+use indicatif::ParallelProgressIterator;
+use rayon::ThreadBuilder;
+use rayon::ThreadPoolBuilder;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::board::BoardWithSteps;
@@ -59,6 +62,8 @@ enum Commands {
         /// Number of scramble steps to generate random puzzle boards
         #[arg(short, long, default_value_t = DEFAULT_SCRAMBLE_STEPS)]
         scramble_steps: usize,
+        #[arg(short, long)]
+        threads: Option<usize>,
     },
     /// Runs one random board, solved it and show the path
     SolveRandom {
@@ -86,6 +91,7 @@ where
 {
     boards
         .par_iter()
+        .progress()
         .map(|b| {
             let mut solver = solver.clone();
             solver.solve(*b).expect("No solution found");
@@ -95,23 +101,34 @@ where
 }
 
 /// Benchmarks the performance of DFS vs BFS on random puzzle boards
-fn benchmark(runs: usize, scramble_steps: usize) {
+fn benchmark(runs: usize, scramble_steps: usize, threads: Option<usize>) {
     println!(
         "Generating {runs} random boards with {scramble_steps} moves and comparing DFS vs BFS..."
     );
+
+    if let Some(t) = threads {
+        ThreadPoolBuilder::new()
+            .num_threads(t)
+            .build_global()
+            .expect("Failed to build thread pool");
+        println!("Using {t} threads for parallel execution.");
+    }
 
     let boards: Vec<Board> = (0..runs)
         .map(|_| Board::random_with_solution(scramble_steps))
         .collect();
 
+    println!("Running DFS...");
     let dfs_run = run_search(
         &boards,
         Solver::new(SimpleSearchStrategy::new(ExplorerStrategy::Dfs)),
     );
+    println!("Running BFS...");
     let bfs_run = run_search(
         &boards,
         Solver::new(SimpleSearchStrategy::new(ExplorerStrategy::Bfs)),
     );
+    println!("Running Heuristic Search...");
     let etc = run_search(&boards, Solver::new(HeuristicSearchStrategy::default()));
 
     print_comparison_table(
@@ -128,10 +145,14 @@ where
     solver.solve(board).expect("Not solution founded");
     let solution = solver.step_by_step_solution();
 
-    for step in &solution {
-        println!("{}", "-".repeat(20));
+    for (step, idx) in solution.iter().zip(0..) {
+        println!("{}", "-".repeat(6));
         println!("{step}");
-        println!("{}", "-".repeat(20));
+
+        println!("distance to solution");
+        println!("  estimated : {}", step.heuristic_distance_to_solution());
+        println!("  real      : {}", solution.len() - idx - 1);
+        println!("{}", "-".repeat(6));
     }
 
     println!("{:#?}", solver.get_solution_stats());
@@ -167,7 +188,8 @@ fn main() {
         Commands::Benchmark {
             runs,
             scramble_steps,
-        } => benchmark(runs, scramble_steps),
+            threads,
+        } => benchmark(runs, scramble_steps, threads),
         Commands::SolveRandom {
             algorithm,
             scramble_steps,

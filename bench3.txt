@@ -1,0 +1,17 @@
+Generating 200 random boards with 200 moves and comparing DFS vs BFS...
+
+Strategy Comparison (runs: 200)
+
+╭─────────────────────────┬───────────┬───────────┬───────────╮
+│ Metric                  ┆ DFS (avg) ┆ BFS (avg) ┆ HTC (avg) │
+╞═════════════════════════╪═══════════╪═══════════╪═══════════╡
+│ Time per run (ms)       ┆     53.97 ┆     88.61 ┆      0.36 │
+│ Nodes explored          ┆     64260 ┆     62810 ┆    617.51 │
+│ Nodes generated         ┆    179592 ┆    317994 ┆      1693 │
+│ Enqueued                ┆    105260 ┆    150730 ┆      1039 │
+│ Discards (duplicates)   ┆     74332 ┆    167264 ┆    654.57 │
+│ Solution length (moves) ┆     59971 ┆     19.76 ┆     24.23 │
+│ Peak frontier           ┆     41007 ┆     35976 ┆    413.26 │
+│ Average frontier        ┆     21859 ┆     21807 ┆    208.50 │
+│ Max depth               ┆     60001 ┆     20.76 ┆     27.27 │
+╰─────────────────────────┴───────────┴───────────┴───────────╯
