@@ -53,6 +53,7 @@ enum SolveAlgorithm {
     Dfs,
     /// Breadth-First Search: explores all neighbors at the current depth before moving deeper
     Bfs,
+    /// Heuristic Search: uses a heuristic to prioritize paths that seem most promising
     #[default]
     Heuristic,
 }
