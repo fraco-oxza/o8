@@ -1,6 +1,6 @@
 [package]
 name = "o8"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2024"
 description = "A high-performance 8-puzzle solver comparing DFS vs BFS search strategies"
 authors = ["Francisco C. Ossa <francisco@oza.cl>"]
