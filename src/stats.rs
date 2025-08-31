@@ -158,8 +158,11 @@ pub fn print_comparison_table(left: &StatsSummary, right: &StatsSummary, other: 
     );
     println!("\n{title}\n");
 
-    // Helper to print a single-metric table
-    let print_metric_table = |metric_name: &str, l: &Metric, r: &Metric, o: &Metric| {
+    // Helper to print a single-metric table with a short description
+    let print_metric_table = |metric_name: &str, desc: &str, l: &Metric, r: &Metric, o: &Metric| {
+        // Brief description line for this metric
+        println!("{metric_name} – {desc}");
+
         let mut t = Table::new();
         t.load_preset(presets::UTF8_FULL_CONDENSED);
         t.apply_modifier(modifiers::UTF8_ROUND_CORNERS);
@@ -206,42 +209,49 @@ pub fn print_comparison_table(left: &StatsSummary, right: &StatsSummary, other: 
 
     print_metric_table(
         "Time per run (ms)",
+        "Wall-clock time to solve one instance (milliseconds).",
         &left.duration_ms,
         &right.duration_ms,
         &other.duration_ms,
     );
     print_metric_table(
         "Nodes explored",
+        "Unique states that were expanded (visited).",
         &left.nodes_explored,
         &right.nodes_explored,
         &other.nodes_explored,
     );
     print_metric_table(
         "Nodes generated",
+        "Total successors produced before filtering (may include duplicates).",
         &left.generated_nodes,
         &right.generated_nodes,
         &other.generated_nodes,
     );
     print_metric_table(
         "Enqueued",
+        "Generated states accepted into the frontier after filtering.",
         &left.enqueued_nodes,
         &right.enqueued_nodes,
         &other.enqueued_nodes,
     );
     print_metric_table(
         "Discards (duplicates)",
+        "Generated states dropped because they were duplicates or already seen.",
         &left.duplicates_pruned,
         &right.duplicates_pruned,
         &other.duplicates_pruned,
     );
     print_metric_table(
         "Solution length (moves)",
+        "Number of moves in the solution path found.",
         &left.solution_moves,
         &right.solution_moves,
         &other.solution_moves,
     );
     print_metric_table(
         "Peak frontier",
+        "Maximum size of the frontier observed (proxy for peak memory).",
         &left.max_frontier,
         &right.max_frontier,
         &other.max_frontier,
@@ -249,6 +259,7 @@ pub fn print_comparison_table(left: &StatsSummary, right: &StatsSummary, other: 
     // Average frontier removed
     print_metric_table(
         "Max depth",
+        "Deepest depth reached in the search tree.",
         &left.max_depth_reached,
         &right.max_depth_reached,
         &other.max_depth_reached,

@@ -17,7 +17,8 @@ The 8-puzzle is a classic sliding puzzle consisting of a 3×3 grid with 8 number
 - 🚀 **High Performance**: Efficient board representation using compact 32-bit encoding
 - 🔄 **Parallel Processing**: Uses Rayon for concurrent puzzle solving
 - 📊 **Comprehensive Statistics**: Detailed performance metrics and comparison tables (mediana y rango intercuartil)
-- 🛠️ **Configurable**: Customizable number of runs and scramble complexity
+- � **Comprehensive Statistics**: Detailed performance metrics with percentile summaries (P50–P99) and comparison tables
+- �🛠️ **Configurable**: Customizable number of runs and scramble complexity
 - 📝 **Well Documented**: Extensive rustdoc documentation throughout
 
 ## Installation
@@ -108,6 +109,21 @@ Peak frontier            12454 […]            457 […]             310 […]
 Average frontier         6227 […]             228 […]             157 […]
 Max depth                187 […]               24 […]              24 […]
 ```
+
+### Benchmark metrics explained
+
+The comparison tables printed by the `benchmark` command show percentile columns for each metric: P50 (median), P75, P90, P95, and P99. These percentiles summarize the distribution across all runs for a given strategy.
+
+- Time per run (ms): Wall-clock time in milliseconds to solve one puzzle instance.
+- Nodes explored: Count of unique board states removed from the frontier and expanded (i.e., states actually visited/expanded by the search).
+- Nodes generated: Total successors produced from all expansions before filtering (may include duplicates or already-seen states).
+- Enqueued: Number of generated states that were accepted and pushed into the frontier/queue/stack after filtering.
+- Discards (duplicates): Number of generated states that were dropped because they were duplicates or already visited.
+- Solution length (moves): Number of moves in the solution path found for the instance.
+- Peak frontier: Maximum size of the frontier (queue/stack/priority queue) observed during the search; a proxy for peak memory use.
+- Max depth: Deepest depth level reached in the search tree for that run.
+
+Note: Percentile columns capture spread and tail behavior. For example, a high P95 on “Time per run” means the slowest 5% of runs take at least that long.
 
 ## Architecture
 
