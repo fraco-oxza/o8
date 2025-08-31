@@ -1,5 +1,7 @@
 # O8 - 8-Puzzle Solver
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/fraco-oxza/o8)
+
 A high-performance 8-puzzle solver in Rust that compares multiple search strategies
 in parallel and reports rich statistics. It supports Depth-First Search (DFS),
 Breadth-First Search (BFS), and a heuristic best-first/A*-style strategy.
