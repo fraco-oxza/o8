@@ -9,6 +9,10 @@ use std::fmt::{self, Display};
 
 use comfy_table::{Attribute, Cell, CellAlignment, ContentArrangement, Table, modifiers, presets};
 
+// Type aliases to keep signatures readable when describing comparison sections
+type SectionAccessor = fn(&StatsSummary) -> &Metric;
+type SectionDesc = (&'static str, &'static str, SectionAccessor);
+
 /// Individual statistics for a single puzzle solve
 ///
 /// Contains detailed metrics about the search process for one puzzle instance,
@@ -97,49 +101,105 @@ impl Metric {
             p99,
         }
     }
+
+    /// Build a Metric from a slice and a projection function.
+    /// Uses nearest-rank percentile on sorted values.
+    #[inline]
+    fn from_slice<T, F>(items: &[T], f: F) -> Self
+    where
+        F: Fn(&T) -> u64,
+    {
+        let n = items.len();
+        if n == 0 {
+            return Metric::default();
+        }
+
+        let mut vals: Vec<u64> = items.iter().map(f).collect();
+        vals.sort_unstable();
+        let idx = |p: u32| -> usize {
+            // nearest-rank: ceil(p/100 * n), 1-based -> to 0-based index
+            let rank = (p as usize * n).div_ceil(100);
+            rank.saturating_sub(1).min(n - 1)
+        };
+        Metric::new(
+            vals[idx(50)],
+            vals[idx(75)],
+            vals[idx(90)],
+            vals[idx(95)],
+            vals[idx(99)],
+        )
+    }
 }
 
 /// Converts a slice of individual stats into an aggregated summary
 impl From<&[Stats]> for StatsSummary {
     fn from(value: &[Stats]) -> Self {
-        // Helper to compute integer percentiles (nearest-rank) for any projection
-        fn summarize<T, F>(items: &[T], f: F) -> Metric
-        where
-            F: Fn(&T) -> u64,
-        {
-            let n = items.len();
-            if n == 0 {
-                return Metric::default();
-            }
-
-            let mut vals: Vec<u64> = items.iter().map(f).collect();
-            vals.sort_unstable();
-            let idx = |p: u32| -> usize {
-                // nearest-rank: ceil(p/100 * n), 1-based -> to 0-based index
-                let rank = (p as usize * n).div_ceil(100);
-                rank.saturating_sub(1).min(n - 1)
-            };
-            let p50 = vals[idx(50)];
-            let p75 = vals[idx(75)];
-            let p90 = vals[idx(90)];
-            let p95 = vals[idx(95)];
-            let p99 = vals[idx(99)];
-
-            Metric::new(p50, p75, p90, p95, p99)
-        }
-
         Self {
             runs: value.len(),
-            nodes_explored: summarize(value, |s| s.nodes_explored as u64),
-            solution_moves: summarize(value, |s| s.solution_moves as u64),
-            max_frontier: summarize(value, |s| s.max_frontier as u64),
-            generated_nodes: summarize(value, |s| s.generated_nodes as u64),
-            enqueued_nodes: summarize(value, |s| s.enqueued_nodes as u64),
-            duplicates_pruned: summarize(value, |s| s.duplicates_pruned as u64),
-            max_depth_reached: summarize(value, |s| s.max_depth_reached as u64),
-            duration_ms: summarize(value, |s| u64::try_from(s.duration_ms).unwrap_or(u64::MAX)),
+            nodes_explored: Metric::from_slice(value, |s| s.nodes_explored as u64),
+            solution_moves: Metric::from_slice(value, |s| s.solution_moves as u64),
+            max_frontier: Metric::from_slice(value, |s| s.max_frontier as u64),
+            generated_nodes: Metric::from_slice(value, |s| s.generated_nodes as u64),
+            enqueued_nodes: Metric::from_slice(value, |s| s.enqueued_nodes as u64),
+            duplicates_pruned: Metric::from_slice(value, |s| s.duplicates_pruned as u64),
+            max_depth_reached: Metric::from_slice(value, |s| s.max_depth_reached as u64),
+            duration_ms: Metric::from_slice(value, |s| {
+                u64::try_from(s.duration_ms).unwrap_or(u64::MAX)
+            }),
         }
     }
+}
+
+// ---------- Rendering helpers (SRP: isolate table rendering) ----------
+
+fn new_base_table() -> Table {
+    let mut t = Table::new();
+    t.load_preset(presets::UTF8_FULL_CONDENSED);
+    t.apply_modifier(modifiers::UTF8_ROUND_CORNERS);
+    t.set_content_arrangement(ContentArrangement::Dynamic);
+    t
+}
+
+fn add_percentile_row(t: &mut Table, label: &str, m: &Metric) {
+    t.add_row([
+        Cell::new(label).add_attribute(Attribute::Bold),
+        Cell::new(m.p50).set_alignment(CellAlignment::Right),
+        Cell::new(m.p75).set_alignment(CellAlignment::Right),
+        Cell::new(m.p90).set_alignment(CellAlignment::Right),
+        Cell::new(m.p95).set_alignment(CellAlignment::Right),
+        Cell::new(m.p99).set_alignment(CellAlignment::Right),
+    ]);
+}
+
+fn add_value_row(t: &mut Table, metric: &str, value: &dyn Display) {
+    t.add_row([
+        Cell::new(metric).add_attribute(Attribute::Bold),
+        Cell::new(format!("{value}")).set_alignment(CellAlignment::Right),
+    ]);
+}
+
+fn print_percentile_section<'a>(
+    title: &str,
+    desc: &str,
+    rows: impl IntoIterator<Item = (&'a str, &'a Metric)>,
+) {
+    println!("{title} – {desc}");
+
+    let mut t = new_base_table();
+    t.set_header([
+        Cell::new(title).add_attribute(Attribute::Bold),
+        Cell::new("P50"),
+        Cell::new("P75"),
+        Cell::new("P90"),
+        Cell::new("P95"),
+        Cell::new("P99"),
+    ]);
+
+    for (label, metric) in rows {
+        add_percentile_row(&mut t, label, metric);
+    }
+
+    println!("{t}\n");
 }
 
 /// Prints a formatted comparison table of two search strategies
@@ -158,112 +218,59 @@ pub fn print_comparison_table(left: &StatsSummary, right: &StatsSummary, other: 
     );
     println!("\n{title}\n");
 
-    // Helper to print a single-metric table with a short description
-    let print_metric_table = |metric_name: &str, desc: &str, l: &Metric, r: &Metric, o: &Metric| {
-        // Brief description line for this metric
-        println!("{metric_name} – {desc}");
+    let strategies: [(&str, &StatsSummary); 3] =
+        [("DFS", left), ("BFS", right), ("Heuristic", other)];
 
-        let mut t = Table::new();
-        t.load_preset(presets::UTF8_FULL_CONDENSED);
-        t.apply_modifier(modifiers::UTF8_ROUND_CORNERS);
-        t.set_content_arrangement(ContentArrangement::Dynamic);
-        t.set_header([
-            Cell::new(metric_name).add_attribute(Attribute::Bold),
-            Cell::new("P50"),
-            Cell::new("P75"),
-            Cell::new("P90"),
-            Cell::new("P95"),
-            Cell::new("P99"),
-        ]);
+    // Descriptor: label, description, accessor to metric in a StatsSummary
+    let sections: [SectionDesc; 8] = [
+        (
+            "Time per run (ms)",
+            "Wall-clock time to solve one instance (milliseconds).",
+            |s| &s.duration_ms,
+        ),
+        (
+            "Nodes explored",
+            "Unique states that were expanded (visited).",
+            |s| &s.nodes_explored,
+        ),
+        (
+            "Nodes generated",
+            "Total successors produced before filtering (may include duplicates).",
+            |s| &s.generated_nodes,
+        ),
+        (
+            "Enqueued",
+            "Generated states accepted into the frontier after filtering.",
+            |s| &s.enqueued_nodes,
+        ),
+        (
+            "Discards (duplicates)",
+            "Generated states dropped because they were duplicates or already seen.",
+            |s| &s.duplicates_pruned,
+        ),
+        (
+            "Solution length (moves)",
+            "Number of moves in the solution path found.",
+            |s| &s.solution_moves,
+        ),
+        (
+            "Peak frontier",
+            "Maximum size of the frontier observed (proxy for peak memory).",
+            |s| &s.max_frontier,
+        ),
+        (
+            "Max depth",
+            "Deepest depth reached in the search tree.",
+            |s| &s.max_depth_reached,
+        ),
+    ];
 
-        // DFS row
-        t.add_row([
-            Cell::new("DFS").add_attribute(Attribute::Bold),
-            Cell::new(l.p50).set_alignment(CellAlignment::Right),
-            Cell::new(l.p75).set_alignment(CellAlignment::Right),
-            Cell::new(l.p90).set_alignment(CellAlignment::Right),
-            Cell::new(l.p95).set_alignment(CellAlignment::Right),
-            Cell::new(l.p99).set_alignment(CellAlignment::Right),
-        ]);
-        // BFS row
-        t.add_row([
-            Cell::new("BFS").add_attribute(Attribute::Bold),
-            Cell::new(r.p50).set_alignment(CellAlignment::Right),
-            Cell::new(r.p75).set_alignment(CellAlignment::Right),
-            Cell::new(r.p90).set_alignment(CellAlignment::Right),
-            Cell::new(r.p95).set_alignment(CellAlignment::Right),
-            Cell::new(r.p99).set_alignment(CellAlignment::Right),
-        ]);
-        // Heuristic row
-        t.add_row([
-            Cell::new("Heuristic").add_attribute(Attribute::Bold),
-            Cell::new(o.p50).set_alignment(CellAlignment::Right),
-            Cell::new(o.p75).set_alignment(CellAlignment::Right),
-            Cell::new(o.p90).set_alignment(CellAlignment::Right),
-            Cell::new(o.p95).set_alignment(CellAlignment::Right),
-            Cell::new(o.p99).set_alignment(CellAlignment::Right),
-        ]);
-
-        println!("{t}\n");
-    };
-
-    print_metric_table(
-        "Time per run (ms)",
-        "Wall-clock time to solve one instance (milliseconds).",
-        &left.duration_ms,
-        &right.duration_ms,
-        &other.duration_ms,
-    );
-    print_metric_table(
-        "Nodes explored",
-        "Unique states that were expanded (visited).",
-        &left.nodes_explored,
-        &right.nodes_explored,
-        &other.nodes_explored,
-    );
-    print_metric_table(
-        "Nodes generated",
-        "Total successors produced before filtering (may include duplicates).",
-        &left.generated_nodes,
-        &right.generated_nodes,
-        &other.generated_nodes,
-    );
-    print_metric_table(
-        "Enqueued",
-        "Generated states accepted into the frontier after filtering.",
-        &left.enqueued_nodes,
-        &right.enqueued_nodes,
-        &other.enqueued_nodes,
-    );
-    print_metric_table(
-        "Discards (duplicates)",
-        "Generated states dropped because they were duplicates or already seen.",
-        &left.duplicates_pruned,
-        &right.duplicates_pruned,
-        &other.duplicates_pruned,
-    );
-    print_metric_table(
-        "Solution length (moves)",
-        "Number of moves in the solution path found.",
-        &left.solution_moves,
-        &right.solution_moves,
-        &other.solution_moves,
-    );
-    print_metric_table(
-        "Peak frontier",
-        "Maximum size of the frontier observed (proxy for peak memory).",
-        &left.max_frontier,
-        &right.max_frontier,
-        &other.max_frontier,
-    );
-    // Average frontier removed
-    print_metric_table(
-        "Max depth",
-        "Deepest depth reached in the search tree.",
-        &left.max_depth_reached,
-        &right.max_depth_reached,
-        &other.max_depth_reached,
-    );
+    for (label, desc, accessor) in sections {
+        let rows = strategies
+            .into_iter()
+            .map(|(name, ss)| (name, accessor(ss)));
+        print_percentile_section(label, desc, rows);
+    }
 
     println!("Legend:");
     println!("- Columns are percentiles: P50 (median), P75, P90, P95, P99.");
@@ -274,34 +281,21 @@ pub fn print_comparison_table(left: &StatsSummary, right: &StatsSummary, other: 
 /// Mirrors the labels used in the comparison table so outputs feel consistent
 /// between `benchmark` and `solve-random` commands.
 pub fn print_run_stats(stats: &Stats) {
-    let mut table = Table::new();
-    table.load_preset(presets::UTF8_FULL_CONDENSED);
-    table.apply_modifier(modifiers::UTF8_ROUND_CORNERS);
-    table.set_content_arrangement(ContentArrangement::Dynamic);
+    let mut table = new_base_table();
     table.set_header(["Metric", "Value"]);
 
-    let mut row = |metric: &str, v: String| {
-        table.add_row([
-            Cell::new(metric).add_attribute(Attribute::Bold),
-            Cell::new(v).set_alignment(CellAlignment::Right),
-        ]);
-    };
-
-    row("Time (ms)", format!("{}", stats.duration_ms));
-    row("Nodes explored", format!("{}", stats.nodes_explored));
-    row("Nodes generated", format!("{}", stats.generated_nodes));
-    row("Enqueued", format!("{}", stats.enqueued_nodes));
-    row(
+    add_value_row(&mut table, "Time (ms)", &stats.duration_ms);
+    add_value_row(&mut table, "Nodes explored", &stats.nodes_explored);
+    add_value_row(&mut table, "Nodes generated", &stats.generated_nodes);
+    add_value_row(&mut table, "Enqueued", &stats.enqueued_nodes);
+    add_value_row(
+        &mut table,
         "Discards (duplicates)",
-        format!("{}", stats.duplicates_pruned),
+        &stats.duplicates_pruned,
     );
-    row(
-        "Solution length (moves)",
-        format!("{}", stats.solution_moves),
-    );
-    row("Peak frontier", format!("{}", stats.max_frontier));
-    // Average frontier removed
-    row("Max depth", format!("{}", stats.max_depth_reached));
+    add_value_row(&mut table, "Solution length (moves)", &stats.solution_moves);
+    add_value_row(&mut table, "Peak frontier", &stats.max_frontier);
+    add_value_row(&mut table, "Max depth", &stats.max_depth_reached);
 
     println!("\nRun statistics\n\n{table}");
 }
